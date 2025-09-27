@@ -16,21 +16,71 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
 
   useEffect(() => {
     // Don't check MiniKit.isInstalled() on mount - let it load naturally
-    const handleVerifyResponse = (response: MiniAppVerifyActionPayload) => {
-      console.log('Verification response:', response);
+    const handleVerifyResponse = async (response: MiniAppVerifyActionPayload) => {
+      console.log('📨 Verification response received:', response);
       
       if (response.status === 'success') {
-        setVerificationState('success');
-        onSuccess({
-          worldId: response.verification_level,
-          nullifierHash: response.nullifier_hash,
-          merkleRoot: response.merkle_root,
-          proof: response.proof,
-          verification_level: response.verification_level,
-        });
+        console.log('✅ Frontend verification successful, now validating proof on backend...');
+        
+        try {
+          // CRITICAL: Validate proof on backend according to World docs
+          const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/worldid/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              proof: response.proof,
+              merkle_root: response.merkle_root,
+              nullifier_hash: response.nullifier_hash,
+              verification_level: response.verification_level,
+              action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
+              signal: 'mofo-verification'
+            })
+          });
+
+          const backendResult = await backendResponse.json();
+          console.log('📨 Backend verification result:', backendResult);
+
+          if (backendResult.success) {
+            console.log('✅ Backend verification successful!');
+            setVerificationState('success');
+            onSuccess({
+              worldId: response.verification_level,
+              nullifierHash: response.nullifier_hash,
+              merkleRoot: response.merkle_root,
+              proof: response.proof,
+              verification_level: response.verification_level,
+              backendVerified: true,
+              user: backendResult.user
+            });
+          } else {
+            console.log('❌ Backend verification failed:', backendResult);
+            setVerificationState('error');
+            setErrorMessage(`Backend verification failed: ${backendResult.error}`);
+          }
+        } catch (error) {
+          console.error('💥 Backend verification error:', error);
+          setVerificationState('error');
+          setErrorMessage('Failed to verify proof on server. Please try again.');
+        }
       } else {
+        console.log('❌ Frontend verification failed:', response);
         setVerificationState('error');
-        setErrorMessage(response.error_code || 'Verification failed');
+        
+        // More specific error messages based on World docs
+        let errorMsg = 'Verification failed';
+        if (response.error_code === 'action_not_found') {
+          errorMsg = `Action "${process.env.NEXT_PUBLIC_WLD_ACTION}" not found in Developer Portal`;
+        } else if (response.error_code === 'invalid_action') {
+          errorMsg = 'Invalid action configuration';
+        } else if (response.error_code === 'user_cancelled') {
+          errorMsg = 'Verification cancelled by user';
+        } else if (response.error_code) {
+          errorMsg = `Error: ${response.error_code}`;
+        }
+        
+        setErrorMessage(errorMsg);
       }
     };
 
@@ -51,36 +101,50 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
       setVerificationState('verifying');
       setErrorMessage('');
 
+      // Debug logging
+      console.log('🔍 Environment check:', {
+        appId: process.env.NEXT_PUBLIC_WLD_APP_ID,
+        action: process.env.NEXT_PUBLIC_WLD_ACTION,
+        appUrl: process.env.NEXT_PUBLIC_APP_URL
+      });
+
       // Check if MiniKit is available only when trying to verify
       if (!MiniKit.isInstalled()) {
+        console.log('❌ MiniKit not installed');
         setVerificationState('error');
         setErrorMessage('Please open this app in World App to verify your identity.');
         return;
       }
 
+      console.log('✅ MiniKit detected, starting verification...');
+
       // Use MiniKit.commands.verify with proper error handling
-      const result = MiniKit.commands.verify({
+      const verifyPayload = {
         action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
         signal: 'mofo-verification',
         verification_level: 'device',
-      } as any);
+      };
+
+      console.log('🚀 Verification payload:', verifyPayload);
+
+      const result = MiniKit.commands.verify(verifyPayload as any);
       
-      console.log('Verification initiated:', result);
+      console.log('📤 Verification initiated:', result);
       
       // The response will be handled by the event listener
     } catch (error: any) {
-      console.error('Verification error:', error);
+      console.error('💥 Verification error:', error);
       setVerificationState('error');
       
       // Better error messages based on World documentation
       if (error?.message?.includes('action')) {
-        setErrorMessage('Action not configured. Please check Developer Portal.');
+        setErrorMessage(`Action "${process.env.NEXT_PUBLIC_WLD_ACTION}" not found. Check Developer Portal.`);
       } else if (error?.message?.includes('signal')) {
         setErrorMessage('Invalid signal. Please contact support.');
       } else if (error?.message?.includes('MiniKit')) {
         setErrorMessage('Please open this app in World App to continue.');
       } else {
-        setErrorMessage('Verification failed. Please try again.');
+        setErrorMessage(`Verification failed: ${error?.message || 'Unknown error'}`);
       }
     }
   };
