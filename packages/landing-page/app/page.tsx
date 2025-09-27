@@ -39,12 +39,6 @@ export default function HomePage() {
               <Brain className="mr-2 h-5 w-5" />
               Start EEG Session
             </Button>
-            <Link href="/auth/signup">
-              <Button size="lg" variant="outline">
-                Learn More
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
           </div>
 
           <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500 mb-10">
@@ -293,15 +287,6 @@ export default function HomePage() {
               <Brain className="mr-2 h-5 w-5" />
               Start EEG Session
             </Button>
-            <Link href="/auth/signup">
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-white bg-transparent text-white hover:bg-white hover:text-black"
-              >
-                Create Account
-              </Button>
-            </Link>
           </div>
         </div>
       </section>

@@ -112,17 +112,6 @@ export default function SignInPage() {
                 Sign In
               </Button>
             </form>
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <Link
-                  href="/auth/signup"
-                  className="font-medium hover:underline"
-                >
-                  Sign up
-                </Link>
-              </p>
-            </div>
             <div className="mt-4 text-center">
               <Link href="/">
                 <Button variant="outline" size="sm">
