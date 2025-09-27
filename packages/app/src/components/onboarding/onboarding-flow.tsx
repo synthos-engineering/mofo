@@ -2,7 +2,6 @@
 
 import { AuthState, OnboardingStep } from '@/types'
 import { SplashScreen } from './steps/splash-screen'
-import { WorldIdVerificationScreen } from './steps/worldid-verification-screen'
 import { VerificationCompleteScreen } from './steps/verification-complete-screen'
 import { EegPairingScreen } from './steps/eeg-pairing-screen'
 import { EegCaptureScreen } from './steps/eeg-capture-screen'
@@ -19,11 +18,8 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
   const renderStep = () => {
     switch (authState.currentStep) {
       case 'splash':
-        return <SplashScreen onComplete={() => onStepComplete('worldid-verification')} />
-      
-      case 'worldid-verification':
         return (
-          <WorldIdVerificationScreen 
+          <SplashScreen 
             onComplete={(walletAddress) => 
               onStepComplete('verification-complete', { 
                 isAuthenticated: true, 
@@ -76,7 +72,16 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
         )
       
       default:
-        return <SplashScreen onComplete={() => onStepComplete('worldid-verification')} />
+        return (
+          <SplashScreen 
+            onComplete={(walletAddress) => 
+              onStepComplete('verification-complete', { 
+                isAuthenticated: true, 
+                walletAddress 
+              })
+            } 
+          />
+        )
     }
   }
 

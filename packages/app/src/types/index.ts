@@ -51,7 +51,6 @@ export interface AuthState {
 
 export type OnboardingStep = 
   | 'splash'
-  | 'worldid-verification' 
   | 'verification-complete'
   | 'eeg-pairing'
   | 'eeg-capture'

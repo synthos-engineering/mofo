@@ -33,7 +33,7 @@ export default function HomePage() {
               isAuthenticated: true,
               walletAddress,
               user: null,
-              currentStep: (savedStep as OnboardingStep) || 'worldid-verification'
+              currentStep: (savedStep as OnboardingStep) || 'verification-complete'
             })
           }
         } else {

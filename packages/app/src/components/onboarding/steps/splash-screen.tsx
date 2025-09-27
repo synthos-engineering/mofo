@@ -1,13 +1,80 @@
 'use client'
 
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Brain, Heart, Globe, Users } from 'lucide-react'
+import { Brain, Heart, Globe, Users, AlertTriangle, Loader2 } from 'lucide-react'
+import { MiniKit } from '@worldcoin/minikit-js'
 
 interface SplashScreenProps {
-  onComplete: () => void
+  onComplete: (walletAddress: string) => void
 }
 
 export function SplashScreen({ onComplete }: SplashScreenProps) {
+  const [isLoading, setIsLoading] = useState(false)
+  const [showWarning, setShowWarning] = useState(false)
+
+  const handleContinueWithWorldID = async () => {
+    // Check if running in World App first
+    if (!MiniKit.isInstalled()) {
+      setShowWarning(true)
+      return
+    }
+
+    setIsLoading(true)
+    
+    try {
+      // Generate nonce from backend
+      const nonceRes = await fetch('/api/nonce')
+      if (!nonceRes.ok) {
+        throw new Error('Failed to generate nonce')
+      }
+      
+      const { nonce } = await nonceRes.json()
+
+      // Initiate wallet auth with MiniKit
+      const { finalPayload } = await MiniKit.commandsAsync.walletAuth({
+        nonce: nonce,
+        expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
+        statement: 'Sign in to Mofo to create your AI dating agent',
+      })
+
+      if (finalPayload.status === 'error') {
+        throw new Error((finalPayload as any).errorMessage || 'Authentication failed')
+      }
+
+      // Verify with backend
+      const verifyRes = await fetch('/api/complete-siwe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload: finalPayload, nonce }),
+      })
+
+      const verifyResult = await verifyRes.json()
+
+      if (verifyResult.status === 'error' || !verifyResult.isValid) {
+        throw new Error('Authentication verification failed')
+      }
+
+      // Send haptic feedback for successful auth
+      MiniKit.commands.sendHapticFeedback({
+        hapticsType: 'notification',
+        style: 'success',
+      })
+
+      onComplete((finalPayload as any).walletAddress || 'unknown')
+    } catch (error) {
+      console.error('Authentication failed:', error)
+      setIsLoading(false)
+      
+      // Send haptic feedback for error
+      if (MiniKit.isInstalled()) {
+        MiniKit.commands.sendHapticFeedback({
+          hapticsType: 'notification',
+          style: 'error',
+        })
+      }
+    }
+  }
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -85,17 +152,47 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           </div>
         </motion.div>
 
+        {/* Warning for non-World App users */}
+        {showWarning && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 w-full max-w-sm"
+          >
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+              <div>
+                <div className="font-medium text-red-800 mb-1">World App Required</div>
+                <div className="text-sm text-red-700 mb-3">
+                  This app requires World App to function properly. Please open this link in World App.
+                </div>
+                <div className="text-xs text-red-600 bg-red-100 p-2 rounded font-mono">
+                  worldapp://mini-app?app_id=app_4ff55a0e5a33ac735bc5146bca65bf60
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* CTA Button */}
         <motion.button
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.8, duration: 0.6 }}
-          onClick={onComplete}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="w-full max-w-sm bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg"
+          onClick={handleContinueWithWorldID}
+          disabled={isLoading}
+          whileHover={!isLoading ? { scale: 1.02 } : {}}
+          whileTap={!isLoading ? { scale: 0.98 } : {}}
+          className="w-full max-w-sm bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
         >
-          Continue with World ID
+          {isLoading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Signing In...</span>
+            </>
+          ) : (
+            'Continue with World ID'
+          )}
         </motion.button>
 
         {/* Footer */}
