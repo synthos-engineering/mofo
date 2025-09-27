@@ -19,63 +19,33 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
     console.log('🔍 MiniKit available:', typeof window !== 'undefined' && MiniKit.isInstalled());
   }, []);
 
-  const handleVerify = async () => {
-    try {
-      setVerificationState('verifying');
-      setErrorMessage('');
+  const signInWithWallet = async () => {
+    setVerificationState('verifying');
+    setErrorMessage('');
 
-      // Check if MiniKit is available
-      if (!MiniKit.isInstalled()) {
-        console.log('❌ MiniKit not installed');
-        setVerificationState('error');
-        setErrorMessage('Please open this app in World App to sign in.');
-        return;
-      }
+    if (!MiniKit.isInstalled()) {
+      setVerificationState('error');
+      setErrorMessage('Please open this app in World App to continue.');
+      return;
+    }
+    
+    const res = await fetch(`/api/nonce`);
+    const { nonce } = await res.json();
 
-      console.log('🔐 Starting wallet authentication...');
+    const { commandPayload: generateMessageResult, finalPayload } = await MiniKit.commandsAsync.walletAuth({
+      nonce: nonce,
+      requestId: '0', // Optional
+      expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000),
+      notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000),
+      statement: 'This is my statement and here is a link https://worldcoin.com/apps',
+    });
 
-      // Get nonce from our API
-      const nonceRes = await fetch('/api/nonce');
-      if (!nonceRes.ok) {
-        throw new Error('Failed to generate nonce');
-      }
-      const { nonce } = await nonceRes.json();
-
-      // Create wallet auth payload as per World docs
-      const walletAuthPayload: WalletAuthInput = {
-        nonce: nonce,
-        requestId: `mofo-${Date.now()}`,
-        expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000), // 1 day ago
-        statement: 'Sign in to Mofo - Your On-chain Flirt Operator. Connect your World ID verified identity with your wallet.',
-      };
-
-      console.log('🚀 Executing wallet auth command...');
-
-      // Use walletAuth command (NOT verify command)
-      const { commandPayload: generateMessageResult, finalPayload } = await MiniKit.commandsAsync.walletAuth(walletAuthPayload);
-      
-      if (finalPayload.status === 'error') {
-        console.log('❌ Wallet authentication failed:', finalPayload);
-        setVerificationState('error');
-        
-        const errorCode = String(finalPayload.error_code || 'unknown');
-        let errorMsg = 'Wallet authentication failed';
-        
-        if (errorCode === 'user_cancelled') {
-          errorMsg = 'Sign-in cancelled by user';
-        } else {
-          errorMsg = `Error: ${errorCode}`;
-        }
-        
-        setErrorMessage(errorMsg);
-        return;
-      }
-
-      console.log('✅ Wallet auth successful, verifying SIWE signature...');
-
-      // Complete SIWE verification on backend
-      const siweResponse = await fetch('/api/complete-siwe', {
+    if (finalPayload.status === 'error') {
+      setVerificationState('error');
+      setErrorMessage('Authentication failed');
+      return;
+    } else {
+      const response = await fetch('/api/complete-siwe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,56 +56,19 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
         }),
       });
 
-      if (!siweResponse.ok) {
-        throw new Error(`SIWE verification failed: ${siweResponse.status}`);
-      }
-
-      const siweResult = await siweResponse.json();
+      const result = await response.json();
       
-      if (!siweResult.isValid) {
-        throw new Error(siweResult.message || 'Invalid signature');
-      }
-
-      console.log('✅ Authentication successful!');
-      setVerificationState('success');
-      
-      // Get additional user info from MiniKit
-      let userData: any = {
-        walletAddress: finalPayload.address,
-        signature: finalPayload.signature,
-        message: finalPayload.message,
-        version: finalPayload.version,
-        authMethod: 'wallet',
-        verifiedAt: new Date().toISOString(),
-        sessionId: `mofo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      };
-
-      try {
-        const additionalUser = await MiniKit.getUserByAddress(finalPayload.address);
-        userData = {
-          ...userData,
-          username: additionalUser.username,
-          profilePictureUrl: additionalUser.profilePictureUrl,
-          permissions: (additionalUser as any).permissions,
-        };
-      } catch (error) {
-        console.log('Could not fetch additional user info:', error);
-      }
-      
-      onSuccess(userData);
-      
-    } catch (error: any) {
-      console.error('💥 Authentication error:', error);
-      setVerificationState('error');
-      
-      if (error?.message?.includes('MiniKit')) {
-        setErrorMessage('Please open this app in World App to continue.');
-      } else if (error?.message?.includes('nonce')) {
-        setErrorMessage('Authentication setup failed. Please try again.');
-      } else if (error?.message?.includes('SIWE')) {
-        setErrorMessage('Signature verification failed. Please try again.');
+      if (result.isValid) {
+        setVerificationState('success');
+        onSuccess({
+          walletAddress: finalPayload.address,
+          signature: finalPayload.signature,
+          message: finalPayload.message,
+          version: finalPayload.version,
+        });
       } else {
-        setErrorMessage(`Authentication failed: ${error?.message || 'Unknown error'}`);
+        setVerificationState('error');
+        setErrorMessage('Authentication failed');
       }
     }
   };
@@ -202,7 +135,7 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
                 {errorMessage || 'Unable to sign you in'}
               </p>
               <button
-                onClick={handleVerify}
+                onClick={signInWithWallet}
                 className="w-full bg-black text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 active:scale-95 text-lg"
               >
                 Try Again
@@ -256,7 +189,7 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
             </div>
 
             <button
-              onClick={handleVerify}
+              onClick={signInWithWallet}
               disabled={isLoading}
               className="w-full bg-black text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-lg"
             >
