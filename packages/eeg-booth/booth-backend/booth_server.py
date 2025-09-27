@@ -285,9 +285,9 @@ class BoothBackend:
             # Start EEG data broadcaster
             broadcast_task = asyncio.create_task(self.broadcast_eeg_data())
             
-            # Create wrapper for websocket handler
-            async def handler_wrapper(websocket, path):
-                await self.eeg_websocket_handler(websocket, path)
+            # Create wrapper for websocket handler (newer websockets library only passes websocket)
+            async def handler_wrapper(websocket):
+                await self.eeg_websocket_handler(websocket, "/")
             
             # Start WebSocket server
             async with websockets.serve(handler_wrapper, "localhost", self.eeg_server_port):

@@ -236,8 +236,8 @@ const EEGVisualization: React.FC<EEGVisualizationProps> = ({ websocket, isConnec
         <div className="eeg-graph">
           <canvas 
             ref={canvasRef}
-            width={800}
-            height={600}
+            width={600}
+            height={420}
             className="eeg-canvas"
           />
           <div className="time-axis">

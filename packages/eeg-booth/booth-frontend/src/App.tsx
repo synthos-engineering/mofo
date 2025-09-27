@@ -243,27 +243,41 @@ function App() {
           </div>
         ) : (
           <div className="qr-section">
-            <div className="privacy-notice">
-              <div className="privacy-icon">🔒</div>
-              <div className="privacy-content">
-                <h3>Privacy Protected</h3>
-                <p>Your brain data is processed securely and only anonymized patterns are stored.</p>
-              </div>
-            </div>
-
             <div className="qr-container">
-              <h2>EEG Station QR Code</h2>
+              <div className="brain-icon">🧠</div>
+              <h2>EEG Booth Verification</h2>
+              <p style={{margin: '0 0 32px 0', color: '#64748b', fontSize: '15px'}}>
+                Connect your scanner to begin brain activity monitoring
+              </p>
+              
+              <div className="privacy-notice">
+                <div className="privacy-icon">🔒</div>
+                <div className="privacy-content">
+                  <h3>Privacy Protected</h3>
+                  <p>No personal data stored on-chain</p>
+                </div>
+              </div>
+
+              <div className="privacy-notice">
+                <div className="privacy-icon">🧠</div>
+                <div className="privacy-content">
+                  <h3>Real-time Processing</h3>
+                  <p>Scientific EEG analysis with immediate results</p>
+                </div>
+              </div>
+
               {qrCodeDataUrl ? (
                 <div className="qr-display">
                   <img src={qrCodeDataUrl} alt="Booth QR Code" className="qr-code" />
                   <div className="qr-instructions">
-                    <p>Scan this QR code with the EEG Scanner app to connect</p>
-                    <p className="qr-subtitle">The QR code contains your booth connection details</p>
+                    <p>Scan with EEG Scanner</p>
+                    <p className="qr-subtitle">Connect to begin your session</p>
                   </div>
                 </div>
               ) : (
                 <div className="qr-loading">
-                  <p>Generating QR Code...</p>
+                  <div className="loading-spinner"></div>
+                  <p>Generating connection code...</p>
                 </div>
               )}
             </div>
