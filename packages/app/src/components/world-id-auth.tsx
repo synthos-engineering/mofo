@@ -24,26 +24,57 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
         
         try {
           // CRITICAL: Validate proof on backend according to World docs
-          const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'}/api/worldid/verify`, {
+          // Add security measures: timeout, error handling, and data validation
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+          
+          const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://mofoworld-verification.up.railway.app'}/api/worldid/verify`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest', // CSRF protection
             },
+            signal: controller.signal,
             body: JSON.stringify({
               proof: response.proof,
               merkle_root: response.merkle_root,
               nullifier_hash: response.nullifier_hash,
-              verification_level: response.verification_level,
+              verification_level: response.verification_level || 'device',
               action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
-              signal: 'mofo-verification'
+              signal: `mofo-${Date.now()}`, // Unique signal per verification
+              app_id: process.env.NEXT_PUBLIC_WLD_APP_ID,
+              timestamp: Date.now()
             })
           });
+          
+          clearTimeout(timeoutId);
+
+          // Security: Validate response status and content type
+          if (!backendResponse.ok) {
+            throw new Error(`HTTP ${backendResponse.status}: ${backendResponse.statusText}`);
+          }
+
+          const contentType = backendResponse.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Invalid response format from verification server');
+          }
 
           const backendResult = await backendResponse.json();
           console.log('📨 Backend verification result:', backendResult);
 
-          if (backendResult.success) {
+          // Security: Validate response structure
+          if (typeof backendResult !== 'object' || backendResult === null) {
+            throw new Error('Invalid response structure from verification server');
+          }
+
+          if (backendResult.success === true) {
             console.log('✅ Backend verification successful!');
+            
+            // Security: Validate that nullifier_hash matches
+            if (backendResult.user?.nullifier_hash !== response.nullifier_hash) {
+              throw new Error('Nullifier hash mismatch - possible tampering detected');
+            }
+            
             setVerificationState('success');
             onSuccess({
               worldId: response.verification_level,
@@ -52,17 +83,35 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
               proof: response.proof,
               verification_level: response.verification_level,
               backendVerified: true,
-              user: backendResult.user
+              user: backendResult.user,
+              verifiedAt: new Date().toISOString(),
+              sessionId: `mofo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
             });
           } else {
             console.log('❌ Backend verification failed:', backendResult);
             setVerificationState('error');
-            setErrorMessage(`Backend verification failed: ${backendResult.error}`);
+            
+            // Security: Don't expose internal error details to user
+            const userMessage = backendResult.error === 'action_not_found' 
+              ? 'Verification service configuration error. Please contact support.'
+              : 'Proof verification failed. Please try again.';
+            
+            setErrorMessage(userMessage);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('💥 Backend verification error:', error);
           setVerificationState('error');
-          setErrorMessage('Failed to verify proof on server. Please try again.');
+          
+          // Security: Don't expose detailed error information
+          let userMessage = 'Verification failed. Please try again.';
+          
+          if (error.name === 'AbortError') {
+            userMessage = 'Verification timed out. Please check your connection and try again.';
+          } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+            userMessage = 'Connection failed. Please check your internet and try again.';
+          }
+          
+          setErrorMessage(userMessage);
         }
       } else {
         console.log('❌ Frontend verification failed:', response);
@@ -118,10 +167,10 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
 
       console.log('✅ MiniKit detected, starting verification...');
 
-      // Use MiniKit.commands.verify with proper error handling
+      // Use MiniKit.commands.verify with proper error handling  
       const verifyPayload = {
         action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
-        signal: 'mofo-verification',
+        signal: `mofo-auth-${Date.now()}`,
         verification_level: 'device',
       };
 

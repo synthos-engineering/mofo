@@ -1,6 +1,6 @@
 // API configuration and utilities for the Agentic Hookups Mini App
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://mofoworld-verification.up.railway.app';
 const AGENT_API_URL = process.env.NEXT_PUBLIC_AGENT_API_URL || 'http://localhost:3002';
 
 // World ID API endpoints
