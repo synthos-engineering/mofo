@@ -191,7 +191,7 @@ function DashboardPage() {
         {/* Header with Action Buttons */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="mt-2 text-3xl font-bold">1Prime Wallet</h1>
+            <h1 className="mt-2 text-3xl font-bold">MoFo Wallet</h1>
           </div>
           <div className="flex items-center gap-2">
             <Link href="/deposit">
