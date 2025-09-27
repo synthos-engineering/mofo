@@ -1,7 +1,7 @@
 {
-  "name": "OnlyAgents",
-  "short_name": "OnlyAgents",
-  "description": "AI-powered dating app with World ID verification",
+  "name": "MoFo",
+  "short_name": "MoFo",
+  "description": "My On-chain Flirt Operator - AI-powered dating with World ID verification",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

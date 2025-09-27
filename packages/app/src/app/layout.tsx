@@ -6,7 +6,7 @@ import { MiniKitProvider } from '@/components/providers/minikit-provider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'OnlyAgents - AI Dating App',
+  title: 'MoFo - My On-chain Flirt Operator',
   description: 'AI-powered matchmaking and dating platform built with World ID',
   manifest: '/manifest.json',
   other: {

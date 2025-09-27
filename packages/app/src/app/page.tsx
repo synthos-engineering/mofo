@@ -8,7 +8,6 @@ import { LoadingScreen } from '@/components/ui/loading-screen'
 import { AuthState, OnboardingStep } from '@/types'
 
 export default function HomePage() {
-  const [isLoading, setIsLoading] = useState(true)
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
     walletAddress: null,
@@ -17,7 +16,7 @@ export default function HomePage() {
   })
 
   useEffect(() => {
-    const initializeApp = async () => {
+    const initializeApp = () => {
       try {
         console.log('MiniKit installed:', MiniKit.isInstalled())
         
@@ -41,8 +40,6 @@ export default function HomePage() {
         }
       } catch (error) {
         console.error('Failed to initialize app:', error)
-      } finally {
-        setIsLoading(false)
       }
     }
 
@@ -56,10 +53,6 @@ export default function HomePage() {
       ...updatedState,
       currentStep: nextStep
     }))
-  }
-
-  if (isLoading) {
-    return <LoadingScreen />
   }
 
   if (authState.currentStep === 'dating-hub' || authState.currentStep === 'completed') {

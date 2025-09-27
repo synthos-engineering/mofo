@@ -30,7 +30,7 @@ export function EnsClaimScreen({ onComplete }: EnsClaimScreenProps) {
     }, 2000)
   }
 
-  const fullEnsName = `${ensName}${lastName ? `.${lastName}` : ''}.onlyagents.eth`
+  const fullEnsName = `${ensName}${lastName ? `.${lastName}` : ''}.mofo.eth`
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -87,7 +87,7 @@ export function EnsClaimScreen({ onComplete }: EnsClaimScreenProps) {
               />
             </div>
             
-            <div className="text-sm text-gray-500 mb-4">.onlyagents.eth</div>
+            <div className="text-sm text-gray-500 mb-4">.mofo.eth</div>
             
             <div className="bg-gray-100 rounded-lg p-3 text-center">
               <div className="font-mono text-gray-800">{fullEnsName}</div>
