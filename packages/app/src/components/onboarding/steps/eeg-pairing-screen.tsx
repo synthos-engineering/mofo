@@ -2,9 +2,9 @@
 
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react'
+import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink, Type } from 'lucide-react'
 import { MiniKit } from '@worldcoin/minikit-js'
-import QrScanner from 'qr-scanner'
+import { Html5Qrcode } from 'html5-qrcode'
 
 interface EegPairingScreenProps {
   onComplete: () => void
@@ -15,6 +15,8 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const [extractedUrl, setExtractedUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
+  const [showManualInput, setShowManualInput] = useState(false)
+  const [manualUrl, setManualUrl] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const processImage = async (file: File) => {
@@ -28,19 +30,18 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
       const imageUrl = URL.createObjectURL(file)
       setCapturedImage(imageUrl)
 
-      // Use QrScanner - much more robust than jsQR
-      console.log('🔍 Starting QR detection with QrScanner...')
+      // Use Html5Qrcode - more reliable than other libraries
+      console.log('🔍 Starting QR detection with Html5Qrcode...')
+      
+      const html5QrCode = new Html5Qrcode("dummy-id") // dummy ID for file scanning
       
       try {
-        const result = await QrScanner.scanImage(file, {
-          returnDetailedScanResult: true,
-        })
-
-        console.log('✅ QR Code successfully detected!')
-        console.log('📄 QR Code data:', result.data)
-        console.log('📍 QR Code corner points:', result.cornerPoints)
+        const result = await html5QrCode.scanFile(file, true)
         
-        setExtractedUrl(result.data)
+        console.log('✅ QR Code successfully detected!')
+        console.log('📄 QR Code data:', result)
+        
+        setExtractedUrl(result)
         
         // Send success haptic
         if (MiniKit.isInstalled()) {
@@ -51,32 +52,14 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
         }
         
       } catch (qrError) {
-        console.log('❌ Detailed scan failed, trying simple scan...')
+        console.error('❌ QR detection failed:', qrError)
+        setError('No QR code found in this image. Please try taking a clearer photo or enter the URL manually.')
         
-        try {
-          // Fallback to simple scan
-          const simpleResult = await QrScanner.scanImage(file)
-          console.log('✅ Simple QR scan succeeded:', simpleResult)
-          setExtractedUrl(simpleResult)
-          
-          if (MiniKit.isInstalled()) {
-            MiniKit.commands.sendHapticFeedback({
-              hapticsType: 'notification',
-              style: 'success',
-            })
-          }
-        } catch (simpleError) {
-          console.error('❌ All QR detection methods failed')
-          console.error('Detailed error:', qrError)
-          console.error('Simple error:', simpleError)
-          setError('No QR code found. Please take a clearer photo with the QR code clearly visible and well-lit.')
-          
-          if (MiniKit.isInstalled()) {
-            MiniKit.commands.sendHapticFeedback({
-              hapticsType: 'notification',
-              style: 'error',
-            })
-          }
+        if (MiniKit.isInstalled()) {
+          MiniKit.commands.sendHapticFeedback({
+            hapticsType: 'notification',
+            style: 'error',
+          })
         }
       }
       
@@ -87,8 +70,23 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
 
     } catch (err) {
       console.error('🚨 Image processing failed:', err)
-      setError('Failed to process the image. Please try again.')
+      setError('Failed to process the image. Please try again or enter URL manually.')
       setIsProcessing(false)
+    }
+  }
+
+  const handleManualSubmit = () => {
+    if (manualUrl.trim()) {
+      console.log('📝 Manual URL entered:', manualUrl)
+      setExtractedUrl(manualUrl.trim())
+      setShowManualInput(false)
+      
+      if (MiniKit.isInstalled()) {
+        MiniKit.commands.sendHapticFeedback({
+          hapticsType: 'impact',
+          style: 'light',
+        })
+      }
     }
   }
 
@@ -115,6 +113,8 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
     setExtractedUrl(null)
     setError(null)
     setCapturedImage(null)
+    setShowManualInput(false)
+    setManualUrl('')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -263,9 +263,52 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             </motion.div>
           )}
 
+          {/* Manual URL Input */}
+          {showManualInput && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 mb-6"
+            >
+              <div className="flex items-center space-x-2 mb-4">
+                <Type className="w-5 h-5 text-gray-600" />
+                <span className="font-medium text-gray-800">Enter EEG Station URL</span>
+              </div>
+              
+              <div className="space-y-3">
+                <input
+                  type="url"
+                  value={manualUrl}
+                  onChange={(e) => setManualUrl(e.target.value)}
+                  placeholder="ws://192.168.1.100:8765 or https://eeg-station.local"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-mono"
+                />
+                
+                <div className="flex space-x-2">
+                  <button
+                    onClick={handleManualSubmit}
+                    disabled={!manualUrl.trim()}
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Connect
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowManualInput(false)
+                      setManualUrl('')
+                    }}
+                    className="bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Action Buttons */}
           <div className="space-y-4">
-            {!extractedUrl && (
+            {!extractedUrl && !showManualInput && (
               <div className="space-y-3">
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -283,6 +326,15 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                       <span>📸 Take Photo of QR Code</span>
                     </>
                   )}
+                </button>
+
+                {/* Manual Input Option */}
+                <button
+                  onClick={() => setShowManualInput(true)}
+                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-medium shadow-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
+                >
+                  <Type className="w-4 h-4" />
+                  <span>⌨️ Enter URL Manually</span>
                 </button>
 
                 {/* Hidden file input */}
