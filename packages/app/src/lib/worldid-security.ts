@@ -223,11 +223,11 @@ export class VerifiedUserSession {
   // Clean up old sessions (older than 24 hours)
   cleanup(): void {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    for (const [sessionId, session] of this.sessions.entries()) {
+    this.sessions.forEach((session, sessionId) => {
       if (new Date(session.lastActivity) < oneDayAgo) {
         this.sessions.delete(sessionId);
       }
-    }
+    });
   }
 }
 

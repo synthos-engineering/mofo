@@ -92,7 +92,7 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
             setVerificationState('error');
             
             // Security: Don't expose internal error details to user
-            const userMessage = backendResult.error === 'action_not_found' 
+            const userMessage = String(backendResult.error) === 'action_not_found' 
               ? 'Verification service configuration error. Please contact support.'
               : 'Proof verification failed. Please try again.';
             
@@ -119,14 +119,15 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
         
         // More specific error messages based on World docs
         let errorMsg = 'Verification failed';
-        if (response.error_code === 'action_not_found') {
+        const errorCode = String(response.error_code);
+        if (errorCode === 'action_not_found') {
           errorMsg = `Action "${process.env.NEXT_PUBLIC_WLD_ACTION}" not found in Developer Portal`;
-        } else if (response.error_code === 'invalid_action') {
+        } else if (errorCode === 'invalid_action') {
           errorMsg = 'Invalid action configuration';
-        } else if (response.error_code === 'user_cancelled') {
+        } else if (errorCode === 'user_cancelled') {
           errorMsg = 'Verification cancelled by user';
         } else if (response.error_code) {
-          errorMsg = `Error: ${response.error_code}`;
+          errorMsg = `Error: ${errorCode}`;
         }
         
         setErrorMessage(errorMsg);
