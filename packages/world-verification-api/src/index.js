@@ -1,8 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import { worldIdRoutes } from './routes/worldid.js';
-import { authRoutes } from './routes/auth.js';
+// Removed deprecated OAuth auth routes - using SIWE wallet auth instead
+import nonceRoutes from './routes/nonce.js';
+import siweRoutes from './routes/siwe.js';
 
 dotenv.config();
 
@@ -15,6 +18,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(cookieParser());
 
 // Health check
 app.get('/health', (req, res) => {
@@ -30,8 +34,9 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/worldid', worldIdRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/worldid', worldIdRoutes);  // Incognito actions verification
+app.use('/api/nonce', nonceRoutes);      // SIWE nonce generation
+app.use('/api', siweRoutes);             // SIWE wallet authentication
 
 // Error handling
 app.use((err, req, res, next) => {
