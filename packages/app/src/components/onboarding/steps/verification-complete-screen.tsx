@@ -10,14 +10,6 @@ interface VerificationCompleteScreenProps {
 export function VerificationCompleteScreen({ onComplete }: VerificationCompleteScreenProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <div className="flex justify-between items-center p-4 text-sm text-gray-500">
-        <span>W-03: KYC Result</span>
-        <div className="flex space-x-2">
-          <button className="p-1">←</button>
-          <button className="p-1">→</button>
-        </div>
-      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16">

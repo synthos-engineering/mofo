@@ -67,14 +67,6 @@ export function AgentDatingHub({ authState }: AgentDatingHubProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <div className="flex justify-between items-center p-4 text-sm text-gray-500">
-        <span>W-10: Agent Dating Hub</span>
-        <div className="flex space-x-2">
-          <button className="p-1">←</button>
-          <button className="p-1">→</button>
-        </div>
-      </div>
 
       {/* Back Button */}
       <div className="px-6 pt-4">
