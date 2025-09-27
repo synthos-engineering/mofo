@@ -31,9 +31,9 @@ export function Navbar() {
             <Image
               src="/logo.png"
               alt="Mofo"
-              width={180}
-              height={60}
-              className="h-12 w-auto"
+              width={280}
+              height={93}
+              className="h-20 w-auto"
             />
           </Link>
           <div className="flex gap-4">
@@ -52,9 +52,9 @@ export function Navbar() {
           <Image
             src="/logo.png"
             alt="Mofo Logo"
-            width={180}
-            height={60}
-            className="h-12 w-auto"
+            width={280}
+            height={93}
+            className="h-20 w-auto"
           />
         </Link>
 
