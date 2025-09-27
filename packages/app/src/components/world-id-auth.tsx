@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult } from '@worldcoin/minikit-js';
+import { MiniKit, WalletAuthInput, MiniAppWalletAuthSuccessPayload } from '@worldcoin/minikit-js';
 import { motion } from 'framer-motion';
 import { Shield, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 
@@ -24,48 +24,46 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
       setVerificationState('verifying');
       setErrorMessage('');
 
-      // Debug logging
-      console.log('🔍 Environment check:', {
-        appId: process.env.NEXT_PUBLIC_WLD_APP_ID,
-        action: process.env.NEXT_PUBLIC_WLD_ACTION,
-        appUrl: process.env.NEXT_PUBLIC_APP_URL
-      });
-
       // Check if MiniKit is available
       if (!MiniKit.isInstalled()) {
         console.log('❌ MiniKit not installed');
         setVerificationState('error');
-        setErrorMessage('Please open this app in World App to verify your identity.');
+        setErrorMessage('Please open this app in World App to sign in.');
         return;
       }
 
-      console.log('✅ MiniKit detected, starting verification...');
+      console.log('🔐 Starting wallet authentication...');
 
-      // Use the proper async method as per World documentation
-      const verifyPayload: VerifyCommandInput = {
-        action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
-        signal: `mofo-auth-${Date.now()}`,
-        verification_level: VerificationLevel.Device,
+      // Get nonce from our API
+      const nonceRes = await fetch('/api/nonce');
+      if (!nonceRes.ok) {
+        throw new Error('Failed to generate nonce');
+      }
+      const { nonce } = await nonceRes.json();
+
+      // Create wallet auth payload as per World docs
+      const walletAuthPayload: WalletAuthInput = {
+        nonce: nonce,
+        requestId: `mofo-${Date.now()}`,
+        expirationTime: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        notBefore: new Date(new Date().getTime() - 24 * 60 * 60 * 1000), // 1 day ago
+        statement: 'Sign in to Mofo - Your On-chain Flirt Operator. Connect your World ID verified identity with your wallet.',
       };
 
-      console.log('🚀 Verification payload:', verifyPayload);
+      console.log('🚀 Executing wallet auth command...');
 
-      // World App will open a drawer prompting the user to confirm the operation
-      const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload);
+      // Use walletAuth command (NOT verify command)
+      const { commandPayload: generateMessageResult, finalPayload } = await MiniKit.commandsAsync.walletAuth(walletAuthPayload);
       
       if (finalPayload.status === 'error') {
-        console.log('❌ Verification failed:', finalPayload);
+        console.log('❌ Wallet authentication failed:', finalPayload);
         setVerificationState('error');
         
         const errorCode = String(finalPayload.error_code || 'unknown');
-        let errorMsg = 'Verification failed';
+        let errorMsg = 'Wallet authentication failed';
         
-        if (errorCode === 'action_not_found') {
-          errorMsg = `Action "${process.env.NEXT_PUBLIC_WLD_ACTION}" not found in Developer Portal`;
-        } else if (errorCode === 'invalid_action') {
-          errorMsg = 'Invalid action configuration';
-        } else if (errorCode === 'user_cancelled') {
-          errorMsg = 'Verification cancelled by user';
+        if (errorCode === 'user_cancelled') {
+          errorMsg = 'Sign-in cancelled by user';
         } else {
           errorMsg = `Error: ${errorCode}`;
         }
@@ -74,86 +72,70 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
         return;
       }
 
-      console.log('✅ Frontend verification successful!', finalPayload);
+      console.log('✅ Wallet auth successful, verifying SIWE signature...');
 
-      // Verify the proof in the backend
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      // Complete SIWE verification on backend
+      const siweResponse = await fetch('/api/complete-siwe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          payload: finalPayload,
+          nonce,
+        }),
+      });
+
+      if (!siweResponse.ok) {
+        throw new Error(`SIWE verification failed: ${siweResponse.status}`);
+      }
+
+      const siweResult = await siweResponse.json();
+      
+      if (!siweResult.isValid) {
+        throw new Error(siweResult.message || 'Invalid signature');
+      }
+
+      console.log('✅ Authentication successful!');
+      setVerificationState('success');
+      
+      // Get additional user info from MiniKit
+      let userData: any = {
+        walletAddress: finalPayload.address,
+        signature: finalPayload.signature,
+        message: finalPayload.message,
+        version: finalPayload.version,
+        authMethod: 'wallet',
+        verifiedAt: new Date().toISOString(),
+        sessionId: `mofo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      };
 
       try {
-        const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://mofoworld-verification.up.railway.app'}/api/worldid/verify`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            payload: finalPayload as ISuccessResult, // Parse only the fields we need to verify
-            action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
-            signal: verifyPayload.signal,
-            // Additional fields for our backend
-            proof: finalPayload.proof,
-            merkle_root: finalPayload.merkle_root,
-            nullifier_hash: finalPayload.nullifier_hash,
-            verification_level: finalPayload.verification_level,
-          }),
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!verifyResponse.ok) {
-          throw new Error(`HTTP ${verifyResponse.status}: ${verifyResponse.statusText}`);
-        }
-
-        const verifyResponseJson = await verifyResponse.json();
-        console.log('📨 Backend verification result:', verifyResponseJson);
-
-        if (verifyResponseJson.success || verifyResponseJson.status === 200) {
-          console.log('✅ Verification success!');
-          setVerificationState('success');
-          
-          onSuccess({
-            worldId: finalPayload.verification_level,
-            nullifierHash: finalPayload.nullifier_hash,
-            merkleRoot: finalPayload.merkle_root,
-            proof: finalPayload.proof,
-            verification_level: finalPayload.verification_level,
-            backendVerified: true,
-            verifiedAt: new Date().toISOString(),
-            sessionId: `mofo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-          });
-        } else {
-          console.log('❌ Backend verification failed:', verifyResponseJson);
-          setVerificationState('error');
-          setErrorMessage('Backend verification failed. Please try again.');
-        }
-      } catch (error: any) {
-        clearTimeout(timeoutId);
-        console.error('💥 Backend verification error:', error);
-        setVerificationState('error');
-        
-        let userMessage = 'Verification failed. Please try again.';
-        if (error.name === 'AbortError') {
-          userMessage = 'Verification timed out. Please check your connection and try again.';
-        } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
-          userMessage = 'Connection failed. Please check your internet and try again.';
-        }
-        
-        setErrorMessage(userMessage);
+        const additionalUser = await MiniKit.getUserByAddress(finalPayload.address);
+        userData = {
+          ...userData,
+          username: additionalUser.username,
+          profilePictureUrl: additionalUser.profilePictureUrl,
+          permissions: (additionalUser as any).permissions,
+        };
+      } catch (error) {
+        console.log('Could not fetch additional user info:', error);
       }
       
+      onSuccess(userData);
+      
     } catch (error: any) {
-      console.error('💥 Verification error:', error);
+      console.error('💥 Authentication error:', error);
       setVerificationState('error');
       
-      // Better error messages
-      if (error?.message?.includes('action')) {
-        setErrorMessage(`Action "${process.env.NEXT_PUBLIC_WLD_ACTION}" not found. Check Developer Portal.`);
-      } else if (error?.message?.includes('MiniKit')) {
+      if (error?.message?.includes('MiniKit')) {
         setErrorMessage('Please open this app in World App to continue.');
+      } else if (error?.message?.includes('nonce')) {
+        setErrorMessage('Authentication setup failed. Please try again.');
+      } else if (error?.message?.includes('SIWE')) {
+        setErrorMessage('Signature verification failed. Please try again.');
       } else {
-        setErrorMessage(`Verification failed: ${error?.message || 'Unknown error'}`);
+        setErrorMessage(`Authentication failed: ${error?.message || 'Unknown error'}`);
       }
     }
   };
@@ -172,10 +154,10 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
             </div>
             <div className="space-y-4">
               <h3 className="text-2xl font-semibold text-black">
-                Verifying Your Identity
+                Signing You In
               </h3>
               <p className="text-gray-700 text-lg">
-                Please complete the verification in World App
+                Please confirm the sign-in request in World App
               </p>
             </div>
           </motion.div>
@@ -193,7 +175,7 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
             </div>
             <div className="space-y-4">
               <h3 className="text-2xl font-semibold text-black">
-                Verification Successful!
+                Sign-in Successful!
               </h3>
               <p className="text-gray-700 text-lg">
                 Welcome to Mofo. Proceeding to next step...
@@ -214,10 +196,10 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
             </div>
             <div className="space-y-4">
               <h3 className="text-2xl font-semibold text-black">
-                Verification Failed
+                Sign-in Failed
               </h3>
               <p className="text-gray-700 text-lg mb-6">
-                {errorMessage || 'Unable to verify your World ID'}
+                {errorMessage || 'Unable to sign you in'}
               </p>
               <button
                 onClick={handleVerify}
@@ -242,28 +224,28 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
             
             <div className="space-y-4">
               <h2 className="text-3xl font-bold text-black">
-                Verify Your Identity
+                Sign In to Mofo
               </h2>
               <p className="text-gray-700 text-lg leading-relaxed">
-                Use World ID to verify you're a real human and protect our community
+                Connect your World App wallet to access your on-chain flirt operator
               </p>
             </div>
 
             <div className="space-y-4 text-sm">
               <div className="bg-gray-50 rounded-xl p-6 space-y-3">
-                <h4 className="font-semibold text-black text-lg">Why World ID?</h4>
+                <h4 className="font-semibold text-black text-lg">Why World App?</h4>
                 <ul className="space-y-2 text-left text-gray-700">
                   <li className="flex items-center space-x-3">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span>Proof of personhood - one account per human</span>
+                    <span>Secure wallet authentication</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span>Privacy-preserving verification</span>
+                    <span>World ID verified identity</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span>No personal data stored</span>
+                    <span>Privacy-preserving sign-in</span>
                   </li>
                   <li className="flex items-center space-x-3">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -283,7 +265,7 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
               ) : (
                 <>
                   <Shield className="w-5 h-5" />
-                  <span>Verify with World ID</span>
+                  <span>Sign In with World App</span>
                 </>
               )}
             </button>
