@@ -18,18 +18,28 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!MiniKit.isInstalled()) {
-      console.warn('MiniKit is not installed - app running in browser mode');
-      return;
-    }
+    // More graceful MiniKit detection
+    const checkMiniKit = () => {
+      if (typeof window !== 'undefined') {
+        if (MiniKit.isInstalled()) {
+          console.log('MiniKit detected - World App integration active');
+          // Subscribe to MiniKit events
+          MiniKit.subscribe(ResponseEvent.MiniAppVerifyAction, handleVerifyResponse);
+        } else {
+          console.log('Running outside World App - some features may be limited');
+        }
+      }
+    };
 
-    console.log('MiniKit detected - World App integration active');
-    
-    // Subscribe to MiniKit events
-    MiniKit.subscribe(ResponseEvent.MiniAppVerifyAction, handleVerifyResponse);
+    // Check immediately and after a small delay
+    checkMiniKit();
+    const timer = setTimeout(checkMiniKit, 1000);
 
     return () => {
-      MiniKit.unsubscribe(ResponseEvent.MiniAppVerifyAction);
+      clearTimeout(timer);
+      if (typeof window !== 'undefined' && MiniKit.isInstalled()) {
+        MiniKit.unsubscribe(ResponseEvent.MiniAppVerifyAction);
+      }
     };
   }, []);
 

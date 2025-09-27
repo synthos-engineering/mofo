@@ -15,12 +15,7 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    if (!MiniKit.isInstalled()) {
-      setVerificationState('error');
-      setErrorMessage('World App is required to use this application');
-      return;
-    }
-
+    // Don't check MiniKit.isInstalled() on mount - let it load naturally
     const handleVerifyResponse = (response: MiniAppVerifyActionPayload) => {
       console.log('Verification response:', response);
       
@@ -39,30 +34,37 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
       }
     };
 
-    MiniKit.subscribe(ResponseEvent.MiniAppVerifyAction, handleVerifyResponse);
+    // Always subscribe to events - MiniKit will handle if it's available
+    if (typeof window !== 'undefined') {
+      MiniKit.subscribe(ResponseEvent.MiniAppVerifyAction, handleVerifyResponse);
+    }
 
     return () => {
-      MiniKit.unsubscribe(ResponseEvent.MiniAppVerifyAction);
+      if (typeof window !== 'undefined') {
+        MiniKit.unsubscribe(ResponseEvent.MiniAppVerifyAction);
+      }
     };
   }, [onSuccess]);
 
   const handleVerify = async () => {
-    if (!MiniKit.isInstalled()) {
-      setVerificationState('error');
-      setErrorMessage('This app requires World App. Please open in World App.');
-      return;
-    }
-
     try {
       setVerificationState('verifying');
       setErrorMessage('');
 
-      // Use MiniKit.commands.verify without strict typing to avoid type issues
+      // Check if MiniKit is available only when trying to verify
+      if (!MiniKit.isInstalled()) {
+        setVerificationState('error');
+        setErrorMessage('Please open this app in World App to verify your identity.');
+        return;
+      }
+
+      // Use MiniKit.commands.verify with proper error handling
       const result = MiniKit.commands.verify({
         action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
-        signal: 'agentic-hookups-verification',
+        signal: 'mofo-verification',
         verification_level: 'device',
       } as any);
+      
       console.log('Verification initiated:', result);
       
       // The response will be handled by the event listener
@@ -75,6 +77,8 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
         setErrorMessage('Action not configured. Please check Developer Portal.');
       } else if (error?.message?.includes('signal')) {
         setErrorMessage('Invalid signal. Please contact support.');
+      } else if (error?.message?.includes('MiniKit')) {
+        setErrorMessage('Please open this app in World App to continue.');
       } else {
         setErrorMessage('Verification failed. Please try again.');
       }
