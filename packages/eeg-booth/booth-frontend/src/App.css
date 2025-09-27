@@ -121,6 +121,85 @@
   color: #9ca3af;
 }
 
+/* EEG Session Styles */
+.eeg-session {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.session-header {
+  text-align: center;
+  padding: 30px 40px 20px;
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  color: white;
+}
+
+.session-header .connected-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.session-header h2 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.connection-status {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.eeg-status {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.eeg-status.connected {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.eeg-status.connecting {
+  background: rgba(249, 115, 22, 0.2);
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.session-time {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.eeg-connecting {
+  padding: 60px 40px;
+  text-align: center;
+}
+
+.eeg-connecting .loading-spinner {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto 20px;
+}
+
+.eeg-connecting p {
+  margin: 8px 0;
+  color: #6b7280;
+}
+
+.eeg-note {
+  font-size: 12px !important;
+  font-family: 'Monaco', 'Menlo', monospace !important;
+  color: #9ca3af !important;
+}
+
 .privacy-notice {
   display: flex;
   align-items: center;

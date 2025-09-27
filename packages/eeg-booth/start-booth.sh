@@ -30,10 +30,10 @@ echo "Activating virtual environment..."
 source .venv/bin/activate
 
 echo "Installing Python dependencies..."
-pip install -q -r requirements.txt
+pip3 install -q -r requirements.txt
 
 echo "🚀 Starting booth backend server..."
-python booth_server.py &
+python3 booth_server.py &
 BACKEND_PID=$!
 
 cd ../booth-frontend

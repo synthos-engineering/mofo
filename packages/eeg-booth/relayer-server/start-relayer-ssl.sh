@@ -40,7 +40,7 @@ echo "Activating virtual environment..."
 source .venv/bin/activate
 
 echo "Installing Python dependencies..."
-pip install -q -r requirements.txt
+pip3 install -q -r requirements.txt
 
 echo "🔐 SSL Certificate Information:"
 echo "   • Certificate: $CERT_DIR/relayer-certificate.pem"
@@ -54,7 +54,7 @@ echo "🚀 Starting Secure WebSocket Relayer Server (WSS) on port 8765..."
 export USE_SSL=true
 export PORT=8765
 
-python server.py
+python3 server.py
 
 echo ""
 echo "✅ SSL Relayer Server Started Successfully!"

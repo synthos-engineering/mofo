@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import QRCode from 'qrcode';
+import EEGVisualization from './components/EEGVisualization';
 import './App.css';
 
 interface BoothStatus {
@@ -24,6 +25,11 @@ function App() {
   const [boothInfo, setBoothInfo] = useState<BoothInfo | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  
+  // EEG WebSocket connection
+  const [eegWebSocket, setEegWebSocket] = useState<WebSocket | null>(null);
+  const [eegConnected, setEegConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
 
   const generateQRCode = async (data: string): Promise<string> => {
     try {
@@ -77,6 +83,44 @@ function App() {
     }
   }, []);
 
+  // EEG WebSocket connection management
+  const connectToEEG = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    console.log('Connecting to EEG WebSocket server...');
+    const ws = new WebSocket('ws://localhost:3005');
+    
+    ws.onopen = () => {
+      console.log('✓ Connected to EEG server');
+      setEegConnected(true);
+      setEegWebSocket(ws);
+      wsRef.current = ws;
+    };
+    
+    ws.onclose = () => {
+      console.log('EEG WebSocket disconnected');
+      setEegConnected(false);
+      setEegWebSocket(null);
+      wsRef.current = null;
+    };
+    
+    ws.onerror = (error) => {
+      console.error('EEG WebSocket error:', error);
+      setEegConnected(false);
+    };
+
+    return ws;
+  }, []);
+
+  const disconnectFromEEG = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+      setEegWebSocket(null);
+      setEegConnected(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchBoothInfo();
     fetchBoothStatus();
@@ -84,8 +128,25 @@ function App() {
     // Poll for status updates every 2 seconds
     const statusInterval = setInterval(fetchBoothStatus, 2000);
 
-    return () => clearInterval(statusInterval);
-  }, [fetchBoothInfo, fetchBoothStatus]);
+    return () => {
+      clearInterval(statusInterval);
+      disconnectFromEEG();
+    };
+  }, [fetchBoothInfo, fetchBoothStatus, disconnectFromEEG]);
+
+  // Connect to EEG when user connects
+  useEffect(() => {
+    if (boothStatus?.connection_status === 'user_connected' && !eegConnected) {
+      // Wait a moment for the booth connection to stabilize, then connect to EEG
+      const timer = setTimeout(() => {
+        connectToEEG();
+      }, 2000);
+      return () => clearTimeout(timer);
+    } else if (boothStatus?.connection_status !== 'user_connected' && eegConnected) {
+      // Disconnect from EEG when user disconnects
+      disconnectFromEEG();
+    }
+  }, [boothStatus?.connection_status, eegConnected, connectToEEG, disconnectFromEEG]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -156,13 +217,29 @@ function App() {
         </div>
 
         {boothStatus?.connection_status === 'user_connected' ? (
-          <div className="connected-state">
-            <div className="connected-icon">✅</div>
-            <h2>Scanner Connected</h2>
-            <p>EEG session is ready to begin</p>
-            <div className="session-info">
-              <p>Connected at: {new Date(boothStatus.timestamp).toLocaleTimeString()}</p>
+          <div className="eeg-session">
+            <div className="session-header">
+              <div className="connected-icon">✅</div>
+              <h2>EEG Session Active</h2>
+              <div className="connection-status">
+                <span className={`eeg-status ${eegConnected ? 'connected' : 'connecting'}`}>
+                  EEG: {eegConnected ? 'Connected' : 'Connecting...'}
+                </span>
+                <span className="session-time">
+                  Started: {new Date(boothStatus.timestamp).toLocaleTimeString()}
+                </span>
+              </div>
             </div>
+            
+            {eegConnected ? (
+              <EEGVisualization websocket={eegWebSocket} isConnected={eegConnected} />
+            ) : (
+              <div className="eeg-connecting">
+                <div className="loading-spinner"></div>
+                <p>Initializing EEG connection...</p>
+                <p className="eeg-note">Connecting to OpenBCI hardware at ws://localhost:8765</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="qr-section">
