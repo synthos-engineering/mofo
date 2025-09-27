@@ -19,6 +19,8 @@ export default function HomePage() {
     const initializeApp = async () => {
       try {
         // Check if running in World App
+        console.log('MiniKit installed:', MiniKit.isInstalled())
+        
         if (MiniKit.isInstalled()) {
           console.log('Running in World App')
           
@@ -32,7 +34,7 @@ export default function HomePage() {
             })
           }
         } else {
-          console.log('Running in browser - simulating World App environment')
+          console.log('Running in browser - World App not detected')
         }
       } catch (error) {
         console.error('Failed to initialize app:', error)
