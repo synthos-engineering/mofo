@@ -2,23 +2,23 @@
 
 import { useEffect, useState } from 'react'
 import { MiniKit } from '@worldcoin/minikit-js'
-import { AuthScreen } from '@/components/auth/auth-screen'
-import { MainApp } from '@/components/main-app'
+import { OnboardingFlow } from '@/components/onboarding/onboarding-flow'
+import { AgentDatingHub } from '@/components/hub/agent-dating-hub'
 import { LoadingScreen } from '@/components/ui/loading-screen'
-import { AuthState } from '@/types'
+import { AuthState, OnboardingStep } from '@/types'
 
 export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
     walletAddress: null,
-    user: null
+    user: null,
+    currentStep: 'splash'
   })
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Check if running in World App
         console.log('MiniKit installed:', MiniKit.isInstalled())
         
         if (MiniKit.isInstalled()) {
@@ -27,10 +27,13 @@ export default function HomePage() {
           // Check if user is already authenticated
           const walletAddress = (MiniKit as any).walletAddress
           if (walletAddress) {
+            // Check if user has completed onboarding
+            const savedStep = localStorage.getItem('onboarding-step')
             setAuthState({
               isAuthenticated: true,
               walletAddress,
-              user: null // Will be loaded later
+              user: null,
+              currentStep: (savedStep as OnboardingStep) || 'worldid-verification'
             })
           }
         } else {
@@ -46,13 +49,27 @@ export default function HomePage() {
     initializeApp()
   }, [])
 
+  const handleStepComplete = (nextStep: OnboardingStep, updatedState?: Partial<AuthState>) => {
+    localStorage.setItem('onboarding-step', nextStep)
+    setAuthState(prev => ({
+      ...prev,
+      ...updatedState,
+      currentStep: nextStep
+    }))
+  }
+
   if (isLoading) {
     return <LoadingScreen />
   }
 
-  if (!authState.isAuthenticated) {
-    return <AuthScreen onAuthSuccess={(authData) => setAuthState(authData)} />
+  if (authState.currentStep === 'dating-hub' || authState.currentStep === 'completed') {
+    return <AgentDatingHub authState={authState} />
   }
 
-  return <MainApp authState={authState} />
+  return (
+    <OnboardingFlow 
+      authState={authState} 
+      onStepComplete={handleStepComplete}
+    />
+  )
 }
