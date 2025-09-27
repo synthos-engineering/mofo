@@ -3,73 +3,83 @@
 import { useState, useEffect } from 'react';
 import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult } from '@worldcoin/minikit-js';
 import { motion } from 'framer-motion';
-import { Shield, CheckCircle, Loader2, AlertCircle, User, Key } from 'lucide-react';
-import { WorldAuth } from '@/lib/auth';
+import { Shield, CheckCircle, Loader2, AlertCircle, Wallet, Key } from 'lucide-react';
+import { WalletAuth } from '@/lib/wallet-auth';
 
-interface CombinedWorldAuthProps {
+interface WalletAuthCombinedProps {
   onSuccess: (userData: any) => void;
   isLoading: boolean;
 }
 
-export function CombinedWorldAuth({ onSuccess, isLoading }: CombinedWorldAuthProps) {
-  const [authState, setAuthState] = useState<'idle' | 'signin' | 'verifying' | 'success' | 'error'>('idle');
-  const [authMethod, setAuthMethod] = useState<'signin' | 'incognito' | null>(null);
+export function WalletAuthCombined({ onSuccess, isLoading }: WalletAuthCombinedProps) {
+  const [authState, setAuthState] = useState<'idle' | 'wallet-auth' | 'verifying' | 'success' | 'error'>('idle');
+  const [authMethod, setAuthMethod] = useState<'wallet' | 'incognito' | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [user, setUser] = useState<any>(null);
-  const worldAuth = WorldAuth.getInstance();
+  const walletAuth = WalletAuth.getInstance();
 
   useEffect(() => {
-    // Check if user is already signed in
-    if (worldAuth.isSignedIn()) {
-      setUser(worldAuth.getUser());
+    // Check if user already has a wallet session
+    if (walletAuth.restoreSession() && walletAuth.isSignedIn()) {
+      const existingUser = walletAuth.getUser();
+      setUser(existingUser);
       setAuthState('success');
-    }
-
-    // Handle OAuth callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-    
-    if (code && state) {
-      handleOAuthCallback(code, state);
+      console.log('✅ Restored wallet session:', existingUser);
     }
   }, []);
 
-  const handleOAuthCallback = async (code: string, state: string) => {
+  // Wallet Authentication (SIWE) - Replaces deprecated Sign in with World ID
+  const handleWalletAuth = async () => {
     try {
-      setAuthState('signin');
-      const user = await worldAuth.handleCallback(code, state);
+      setAuthState('wallet-auth');
+      setAuthMethod('wallet');
+      setErrorMessage('');
+
+      if (!MiniKit.isInstalled()) {
+        setAuthState('error');
+        setErrorMessage('Please open this app in World App for wallet authentication.');
+        return;
+      }
+
+      console.log('🔐 Starting wallet authentication...');
+      
+      const user = await walletAuth.signInWithWallet();
+      
+      // Persist session
+      walletAuth.persistSession();
+      
       setUser(user);
       setAuthState('success');
-      onSuccess({
-        authMethod: 'signin',
-        user,
-        worldId: user.sub,
-        verificationLevel: user['https://id.worldcoin.org/v1']?.verification_level,
-        signedIn: true,
-      });
       
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
+      onSuccess({
+        authMethod: 'wallet',
+        user,
+        walletAddress: user.walletAddress,
+        username: user.username,
+        signature: user.signature,
+        message: user.message,
+        signedAt: user.signedAt,
+        sessionPersistent: true,
+      });
+
     } catch (error: any) {
-      console.error('OAuth callback error:', error);
+      console.error('💥 Wallet authentication error:', error);
       setAuthState('error');
-      setErrorMessage('Sign-in failed. Please try again.');
+      
+      let userMessage = 'Wallet authentication failed. Please try again.';
+      if (error.message?.includes('World App')) {
+        userMessage = 'Please open this app in World App to continue.';
+      } else if (error.message?.includes('nonce')) {
+        userMessage = 'Authentication expired. Please try again.';
+      } else if (error.message?.includes('signature')) {
+        userMessage = 'Signature verification failed. Please try again.';
+      }
+      
+      setErrorMessage(userMessage);
     }
   };
 
-  // Sign in with World ID (OIDC)
-  const handleSignIn = () => {
-    try {
-      setAuthMethod('signin');
-      worldAuth.initiateSignIn();
-    } catch (error: any) {
-      setAuthState('error');
-      setErrorMessage('Failed to initiate sign-in.');
-    }
-  };
-
-  // Incognito Action (for specific actions)
+  // Incognito Action (for specific actions) - Keep existing functionality
   const handleIncognitoAction = async (action: string = 'login') => {
     try {
       setAuthState('verifying');
@@ -133,6 +143,7 @@ export function CombinedWorldAuth({ onSuccess, isLoading }: CombinedWorldAuthPro
           proof: finalPayload.proof,
           verification_level: finalPayload.verification_level,
           backendVerified: true,
+          sessionPersistent: false,
         });
       } else {
         setAuthState('error');
@@ -158,13 +169,32 @@ export function CombinedWorldAuth({ onSuccess, isLoading }: CombinedWorldAuthPro
           
           <div className="space-y-4">
             <h3 className="text-2xl font-semibold text-black">Welcome!</h3>
-            <p className="text-gray-700">You're successfully signed in with World ID</p>
+            <p className="text-gray-700">
+              {authMethod === 'wallet' 
+                ? 'Successfully authenticated with your wallet'
+                : 'Successfully verified with World ID'
+              }
+            </p>
             
             <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+              {user.walletAddress && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Wallet:</span>
+                  <span className="text-black font-mono text-sm">
+                    {user.walletAddress.substring(0, 6)}...{user.walletAddress.substring(-4)}
+                  </span>
+                </div>
+              )}
+              {user.username && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Username:</span>
+                  <span className="text-black font-medium">{user.username}</span>
+                </div>
+              )}
               <div className="flex justify-between">
-                <span className="text-gray-600">Verification:</span>
-                <span className="text-black font-medium">
-                  {user['https://id.worldcoin.org/v1']?.verification_level || 'device'}
+                <span className="text-gray-600">Auth Method:</span>
+                <span className="text-green-600 font-medium">
+                  {authMethod === 'wallet' ? '🔐 Wallet Auth' : '🕵️ Incognito'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -172,12 +202,25 @@ export function CombinedWorldAuth({ onSuccess, isLoading }: CombinedWorldAuthPro
                 <span className="text-green-600 font-medium">✅ Verified Human</span>
               </div>
             </div>
+
+            {authMethod === 'wallet' && (
+              <button
+                onClick={() => {
+                  walletAuth.signOut();
+                  setAuthState('idle');
+                  setUser(null);
+                }}
+                className="w-full bg-gray-200 text-black font-semibold py-2 px-4 rounded-xl transition-all duration-200 active:scale-95"
+              >
+                Sign Out
+              </button>
+            )}
           </div>
         </motion.div>
       );
     }
 
-    if (authState === 'signin' || authState === 'verifying') {
+    if (authState === 'wallet-auth' || authState === 'verifying') {
       return (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
@@ -189,11 +232,11 @@ export function CombinedWorldAuth({ onSuccess, isLoading }: CombinedWorldAuthPro
           </div>
           <div className="space-y-4">
             <h3 className="text-2xl font-semibold text-black">
-              {authMethod === 'signin' ? 'Signing In...' : 'Verifying...'}
+              {authMethod === 'wallet' ? 'Authenticating Wallet...' : 'Verifying...'}
             </h3>
             <p className="text-gray-700">
-              {authMethod === 'signin' 
-                ? 'Please complete sign-in with World ID' 
+              {authMethod === 'wallet' 
+                ? 'Please sign the message in World App' 
                 : 'Please complete verification in World App'
               }
             </p>
@@ -216,7 +259,11 @@ export function CombinedWorldAuth({ onSuccess, isLoading }: CombinedWorldAuthPro
             <h3 className="text-2xl font-semibold text-black">Authentication Failed</h3>
             <p className="text-gray-700">{errorMessage}</p>
             <button
-              onClick={() => setAuthState('idle')}
+              onClick={() => {
+                setAuthState('idle');
+                setAuthMethod(null);
+                setErrorMessage('');
+              }}
               className="w-full bg-black text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 active:scale-95"
             >
               Try Again
@@ -238,18 +285,21 @@ export function CombinedWorldAuth({ onSuccess, isLoading }: CombinedWorldAuthPro
         
         <div className="space-y-4">
           <h2 className="text-3xl font-bold text-black">Choose Authentication</h2>
-          <p className="text-gray-700 text-lg">Sign in or verify specific actions with World ID</p>
+          <p className="text-gray-700 text-lg">Connect your wallet or verify specific actions</p>
         </div>
 
         <div className="space-y-4">
-          {/* Sign in with World ID */}
+          {/* Wallet Authentication (SIWE) - Recommended */}
           <button
-            onClick={handleSignIn}
+            onClick={handleWalletAuth}
             disabled={isLoading}
             className="w-full bg-blue-600 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 active:scale-95 flex items-center justify-center space-x-3"
           >
-            <User className="w-5 h-5" />
-            <span>Sign in with World ID</span>
+            <Wallet className="w-5 h-5" />
+            <div className="text-left">
+              <div>Connect Wallet</div>
+              <div className="text-sm text-blue-200">Recommended • Persistent session</div>
+            </div>
           </button>
 
           {/* Incognito Action */}
@@ -259,15 +309,18 @@ export function CombinedWorldAuth({ onSuccess, isLoading }: CombinedWorldAuthPro
             className="w-full bg-black text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 active:scale-95 flex items-center justify-center space-x-3"
           >
             <Key className="w-5 h-5" />
-            <span>Verify with Incognito Action</span>
+            <div className="text-left">
+              <div>Verify with Action</div>
+              <div className="text-sm text-gray-300">Privacy-first • No persistent session</div>
+            </div>
           </button>
         </div>
 
         <div className="bg-gray-50 rounded-xl p-6 space-y-3">
           <h4 className="font-semibold text-black">What's the difference?</h4>
           <div className="text-sm text-gray-700 space-y-2">
-            <p><strong>Sign in:</strong> Standard OAuth authentication, stores session</p>
-            <p><strong>Incognito:</strong> Cryptographic proof, privacy-preserving verification</p>
+            <p><strong>Wallet Auth:</strong> Sign with your wallet, get persistent session + user profile</p>
+            <p><strong>Incognito:</strong> Zero-knowledge proof, maximum privacy, single-use verification</p>
           </div>
         </div>
       </motion.div>

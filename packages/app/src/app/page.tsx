@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { MiniKit, ResponseEvent, MiniAppVerifyActionPayload } from '@worldcoin/minikit-js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Loader2, ChevronRight } from 'lucide-react';
-import { CombinedWorldAuth } from '@/components/world-auth-combined';
+import { WalletAuthCombined } from '@/components/wallet-auth-combined';
 // Removed complex components for simplified World App
 
 type AppState = 
@@ -73,7 +73,7 @@ export default function HomePage() {
       
       case 'auth':
         return (
-          <CombinedWorldAuth 
+          <WalletAuthCombined 
             onSuccess={(userData) => {
               setUser(userData);
               handleStateTransition('success');
