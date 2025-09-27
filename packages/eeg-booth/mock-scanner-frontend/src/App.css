@@ -1,0 +1,368 @@
+.scanner-app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.scanner-header {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.scanner-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.scanner-header h1 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 20px;
+  color: white;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.scanner-main {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+
+.connection-section {
+  text-align: center;
+}
+
+.scan-instructions h2 {
+  color: white;
+  margin: 0 0 12px 0;
+  font-size: 20px;
+}
+
+.scan-instructions p {
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0 0 32px 0;
+  line-height: 1.6;
+}
+
+.privacy-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 32px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.privacy-icon {
+  font-size: 20px;
+}
+
+.privacy-content h3 {
+  margin: 0 0 6px 0;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.privacy-content p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.connection-options {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.scan-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #000;
+  color: white;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scan-button:hover {
+  background: #333;
+  transform: translateY(-2px);
+}
+
+.camera-icon {
+  font-size: 20px;
+}
+
+.manual-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.manual-button {
+  background: transparent;
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.manual-button:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.manual-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.manual-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+}
+
+.manual-form button {
+  padding: 10px 16px;
+  background: #000;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.scanning-section {
+  text-align: center;
+  color: white;
+}
+
+.scanning-section h2 {
+  margin: 0 0 20px 0;
+}
+
+.camera-container {
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 20px 0;
+  position: relative;
+}
+
+.camera-video {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+}
+
+.stop-scan-button {
+  background: #EF4444;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 20px;
+}
+
+.connecting-section {
+  text-align: center;
+  color: white;
+  padding: 40px 20px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.connected-section {
+  color: white;
+}
+
+.connection-info {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.connection-info h2 {
+  margin: 0 0 12px 0;
+  color: #10B981;
+}
+
+.scanned-data {
+  margin-top: 12px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.test-button {
+  flex: 1;
+  background: #10B981;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.disconnect-button {
+  background: #EF4444;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.message-log {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-log h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: white;
+}
+
+.messages {
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.message.sent {
+  background: rgba(59, 130, 246, 0.3);
+  align-self: flex-end;
+  max-width: 80%;
+}
+
+.message.received {
+  background: rgba(16, 185, 129, 0.3);
+  align-self: flex-start;
+  max-width: 80%;
+}
+
+.timestamp {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.message-text {
+  color: white;
+  word-wrap: break-word;
+}
+
+.error-section {
+  text-align: center;
+  color: white;
+  padding: 40px 20px;
+}
+
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.error-section h2 {
+  color: #EF4444;
+  margin: 0 0 12px 0;
+}
+
+.error-section button {
+  background: #3B82F6;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+  .scanner-main {
+    padding: 20px 16px;
+  }
+  
+  .camera-video {
+    height: 250px;
+  }
+  
+  .controls {
+    flex-direction: column;
+  }
+  
+  .manual-form {
+    flex-direction: column;
+  }
+}
