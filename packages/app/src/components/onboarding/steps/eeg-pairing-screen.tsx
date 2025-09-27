@@ -17,39 +17,28 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const streamRef = useRef<MediaStream | null>(null)
 
   const requestCameraPermission = useCallback(async () => {
-    if (!MiniKit.isInstalled()) {
-      // Fallback for browser testing
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-        setCameraPermission('granted')
-        return stream
-      } catch (error) {
-        setCameraPermission('denied')
-        return null
-      }
-    }
-
-    setCameraPermission('pending')
-    
     try {
-      const { finalPayload } = await MiniKit.commandsAsync.requestPermission({
-        permission: 'camera' as any // Camera permission request
+      // If in World App and camera is already granted at app level, just access it directly
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment', // Use back camera for QR scanning
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
       })
-
-      if (finalPayload.status === 'success') {
-        setCameraPermission('granted')
-        // Now access camera using standard Web API
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } // Use back camera for QR scanning
-        })
-        return stream
-      } else {
-        setCameraPermission('denied')
-        return null
-      }
+      setCameraPermission('granted')
+      return stream
     } catch (error) {
-      console.error('Camera permission request failed:', error)
+      console.error('Camera access failed:', error)
       setCameraPermission('denied')
+      
+      // Send haptic feedback for error
+      if (MiniKit.isInstalled()) {
+        MiniKit.commands.sendHapticFeedback({
+          hapticsType: 'notification',
+          style: 'error',
+        })
+      }
       return null
     }
   }, [])
@@ -225,23 +214,14 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             )}
 
             {/* Permission Status */}
-            {cameraPermission === 'pending' && (
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4 w-full max-w-sm">
-                <div className="text-center">
-                  <div className="text-blue-800 font-medium">Requesting Camera Permission</div>
-                  <div className="text-sm text-blue-600">Please allow camera access to scan QR codes</div>
-                </div>
-              </div>
-            )}
-
             {cameraPermission === 'denied' && (
               <div className="bg-red-50 border border-red-100 rounded-xl p-4 mb-4 w-full max-w-sm">
                 <div className="flex items-start space-x-3">
                   <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
                   <div>
-                    <div className="font-medium text-red-800">Camera Access Denied</div>
+                    <div className="font-medium text-red-800">Camera Access Failed</div>
                     <div className="text-sm text-red-700">
-                      Please enable camera access in settings to scan QR codes
+                      Unable to access camera. Please check camera permissions or try again.
                     </div>
                   </div>
                 </div>
