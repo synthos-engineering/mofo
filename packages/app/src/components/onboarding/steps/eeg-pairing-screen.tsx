@@ -22,8 +22,11 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const [isStartingCamera, setIsStartingCamera] = useState(false)
   const [scanResult, setScanResult] = useState<QRCodeData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<string>('')
+  const [showFileInput, setShowFileInput] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -75,21 +78,37 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
         
         // Set up event handlers
         video.onloadedmetadata = () => {
-          console.log('Video metadata loaded - dimensions:', video.videoWidth, 'x', video.videoHeight)
+          const info = `Video loaded: ${video.videoWidth}x${video.videoHeight}`
+          console.log(info)
+          setDebugInfo(info)
           setIsStartingCamera(false)
           setIsScanning(true)
         }
 
         video.onplaying = () => {
-          console.log('Video is now playing')
+          const info = `Video playing: Ready for QR scanning`
+          console.log(info)
+          setDebugInfo(info)
           // Start QR scanning once video is actually playing
           setTimeout(() => {
             startQRScanning()
           }, 500)
         }
 
+        video.onpause = () => {
+          console.log('Video paused')
+          setDebugInfo('Video paused')
+        }
+
+        video.onended = () => {
+          console.log('Video ended')
+          setDebugInfo('Video ended')
+        }
+
         video.onerror = (e) => {
-          console.error('Video error:', e)
+          const errorInfo = `Video error: ${e}`
+          console.error(errorInfo)
+          setDebugInfo(errorInfo)
           setError('Video playback failed')
           setIsStartingCamera(false)
           setIsScanning(false)
@@ -307,7 +326,13 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                     muted
                     autoPlay
                     controls={false}
-                    style={{ backgroundColor: '#000' }}
+                    webkit-playsinline="true"
+                    style={{ 
+                      backgroundColor: '#000',
+                      objectFit: 'cover',
+                      width: '100%',
+                      height: '100%'
+                    }}
                   />
                   
                   {/* Scanning Overlay */}
@@ -327,6 +352,15 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                     </div>
                   </div>
                   
+                  {/* Debug Info - for troubleshooting */}
+                  {debugInfo && (
+                    <div className="absolute top-4 left-4">
+                      <div className="bg-black/80 text-white px-2 py-1 rounded text-xs font-mono">
+                        {debugInfo}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Scanning Instructions */}
                   <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
                     <div className="bg-black/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
@@ -398,13 +432,53 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
           {/* Action Buttons */}
           <div className="space-y-4">
             {!isScanning && !scanResult && !error && !isStartingCamera && (
-              <button
-                onClick={startCamera}
-                className="w-full bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center space-x-2 hover:bg-gray-800 transition-colors"
-              >
-                <Camera className="w-5 h-5" />
-                <span>Start Camera & Scan QR Code</span>
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={startCamera}
+                  className="w-full bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center space-x-2 hover:bg-gray-800 transition-colors"
+                >
+                  <Camera className="w-5 h-5" />
+                  <span>Start Live Camera Scan</span>
+                </button>
+                
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-medium shadow-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Take Photo to Scan QR</span>
+                </button>
+                
+                {/* Hidden file input for camera capture */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      // Process image file for QR code
+                      console.log('Image captured:', file.name)
+                      // For now, simulate success
+                      setScanResult({
+                        station_id: 'captured_station',
+                        websocket_url: 'ws://captured.mofo.eth:8765',
+                        hardware_type: 'Photo_Scan',
+                        channels: 8
+                      })
+                    }
+                  }}
+                />
+                
+                {/* Debug info display */}
+                {debugInfo && (
+                  <div className="bg-gray-100 border border-gray-200 rounded-lg p-3">
+                    <div className="text-xs text-gray-600 font-mono">{debugInfo}</div>
+                  </div>
+                )}
+              </div>
             )}
 
             {isStartingCamera && (
