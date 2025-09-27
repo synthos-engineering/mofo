@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MiniKit, ResponseEvent, MiniAppVerifyActionPayload } from '@worldcoin/minikit-js';
+import { MiniKit, VerifyCommandInput, VerificationLevel, ISuccessResult } from '@worldcoin/minikit-js';
 import { motion } from 'framer-motion';
 import { Shield, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 
@@ -15,136 +15,9 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
   const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    // Don't check MiniKit.isInstalled() on mount - let it load naturally
-    const handleVerifyResponse = async (response: MiniAppVerifyActionPayload) => {
-      console.log('📨 Verification response received:', response);
-      
-      if (response.status === 'success') {
-        console.log('✅ Frontend verification successful, now validating proof on backend...');
-        
-        try {
-          // CRITICAL: Validate proof on backend according to World docs
-          // Add security measures: timeout, error handling, and data validation
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-          
-          const backendResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://mofoworld-verification.up.railway.app'}/api/worldid/verify`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest', // CSRF protection
-            },
-            signal: controller.signal,
-            body: JSON.stringify({
-              proof: response.proof,
-              merkle_root: response.merkle_root,
-              nullifier_hash: response.nullifier_hash,
-              verification_level: response.verification_level || 'device',
-              action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
-              signal: `mofo-${Date.now()}`, // Unique signal per verification
-              app_id: process.env.NEXT_PUBLIC_WLD_APP_ID,
-              timestamp: Date.now()
-            })
-          });
-          
-          clearTimeout(timeoutId);
-
-          // Security: Validate response status and content type
-          if (!backendResponse.ok) {
-            throw new Error(`HTTP ${backendResponse.status}: ${backendResponse.statusText}`);
-          }
-
-          const contentType = backendResponse.headers.get('content-type');
-          if (!contentType || !contentType.includes('application/json')) {
-            throw new Error('Invalid response format from verification server');
-          }
-
-          const backendResult = await backendResponse.json();
-          console.log('📨 Backend verification result:', backendResult);
-
-          // Security: Validate response structure
-          if (typeof backendResult !== 'object' || backendResult === null) {
-            throw new Error('Invalid response structure from verification server');
-          }
-
-          if (backendResult.success === true) {
-            console.log('✅ Backend verification successful!');
-            
-            // Security: Validate that nullifier_hash matches
-            if (backendResult.user?.nullifier_hash !== response.nullifier_hash) {
-              throw new Error('Nullifier hash mismatch - possible tampering detected');
-            }
-            
-            setVerificationState('success');
-            onSuccess({
-              worldId: response.verification_level,
-              nullifierHash: response.nullifier_hash,
-              merkleRoot: response.merkle_root,
-              proof: response.proof,
-              verification_level: response.verification_level,
-              backendVerified: true,
-              user: backendResult.user,
-              verifiedAt: new Date().toISOString(),
-              sessionId: `mofo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-            });
-          } else {
-            console.log('❌ Backend verification failed:', backendResult);
-            setVerificationState('error');
-            
-            // Security: Don't expose internal error details to user
-            const userMessage = String(backendResult.error) === 'action_not_found' 
-              ? 'Verification service configuration error. Please contact support.'
-              : 'Proof verification failed. Please try again.';
-            
-            setErrorMessage(userMessage);
-          }
-        } catch (error: any) {
-          console.error('💥 Backend verification error:', error);
-          setVerificationState('error');
-          
-          // Security: Don't expose detailed error information
-          let userMessage = 'Verification failed. Please try again.';
-          
-          if (error.name === 'AbortError') {
-            userMessage = 'Verification timed out. Please check your connection and try again.';
-          } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
-            userMessage = 'Connection failed. Please check your internet and try again.';
-          }
-          
-          setErrorMessage(userMessage);
-        }
-      } else {
-        console.log('❌ Frontend verification failed:', response);
-        setVerificationState('error');
-        
-        // More specific error messages based on World docs
-        let errorMsg = 'Verification failed';
-        const errorCode = String(response.error_code);
-        if (errorCode === 'action_not_found') {
-          errorMsg = `Action "${process.env.NEXT_PUBLIC_WLD_ACTION}" not found in Developer Portal`;
-        } else if (errorCode === 'invalid_action') {
-          errorMsg = 'Invalid action configuration';
-        } else if (errorCode === 'user_cancelled') {
-          errorMsg = 'Verification cancelled by user';
-        } else if (response.error_code) {
-          errorMsg = `Error: ${errorCode}`;
-        }
-        
-        setErrorMessage(errorMsg);
-      }
-    };
-
-    // Always subscribe to events - MiniKit will handle if it's available
-    if (typeof window !== 'undefined') {
-      MiniKit.subscribe(ResponseEvent.MiniAppVerifyAction, handleVerifyResponse);
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        MiniKit.unsubscribe(ResponseEvent.MiniAppVerifyAction);
-      }
-    };
-  }, [onSuccess]);
+    // No need for event subscriptions with the async method
+    console.log('🔍 MiniKit available:', typeof window !== 'undefined' && MiniKit.isInstalled());
+  }, []);
 
   const handleVerify = async () => {
     try {
@@ -158,7 +31,7 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
         appUrl: process.env.NEXT_PUBLIC_APP_URL
       });
 
-      // Check if MiniKit is available only when trying to verify
+      // Check if MiniKit is available
       if (!MiniKit.isInstalled()) {
         console.log('❌ MiniKit not installed');
         setVerificationState('error');
@@ -168,29 +41,115 @@ export function WorldIDAuth({ onSuccess, isLoading }: WorldIDAuthProps) {
 
       console.log('✅ MiniKit detected, starting verification...');
 
-      // Use MiniKit.commands.verify with proper error handling  
-      const verifyPayload = {
+      // Use the proper async method as per World documentation
+      const verifyPayload: VerifyCommandInput = {
         action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
         signal: `mofo-auth-${Date.now()}`,
-        verification_level: 'device',
+        verification_level: VerificationLevel.Device,
       };
 
       console.log('🚀 Verification payload:', verifyPayload);
 
-      const result = MiniKit.commands.verify(verifyPayload as any);
+      // World App will open a drawer prompting the user to confirm the operation
+      const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload);
       
-      console.log('📤 Verification initiated:', result);
+      if (finalPayload.status === 'error') {
+        console.log('❌ Verification failed:', finalPayload);
+        setVerificationState('error');
+        
+        const errorCode = String(finalPayload.error_code || 'unknown');
+        let errorMsg = 'Verification failed';
+        
+        if (errorCode === 'action_not_found') {
+          errorMsg = `Action "${process.env.NEXT_PUBLIC_WLD_ACTION}" not found in Developer Portal`;
+        } else if (errorCode === 'invalid_action') {
+          errorMsg = 'Invalid action configuration';
+        } else if (errorCode === 'user_cancelled') {
+          errorMsg = 'Verification cancelled by user';
+        } else {
+          errorMsg = `Error: ${errorCode}`;
+        }
+        
+        setErrorMessage(errorMsg);
+        return;
+      }
+
+      console.log('✅ Frontend verification successful!', finalPayload);
+
+      // Verify the proof in the backend
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+      try {
+        const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://mofoworld-verification.up.railway.app'}/api/worldid/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            payload: finalPayload as ISuccessResult, // Parse only the fields we need to verify
+            action: process.env.NEXT_PUBLIC_WLD_ACTION || 'login',
+            signal: verifyPayload.signal,
+            // Additional fields for our backend
+            proof: finalPayload.proof,
+            merkle_root: finalPayload.merkle_root,
+            nullifier_hash: finalPayload.nullifier_hash,
+            verification_level: finalPayload.verification_level,
+          }),
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!verifyResponse.ok) {
+          throw new Error(`HTTP ${verifyResponse.status}: ${verifyResponse.statusText}`);
+        }
+
+        const verifyResponseJson = await verifyResponse.json();
+        console.log('📨 Backend verification result:', verifyResponseJson);
+
+        if (verifyResponseJson.success || verifyResponseJson.status === 200) {
+          console.log('✅ Verification success!');
+          setVerificationState('success');
+          
+          onSuccess({
+            worldId: finalPayload.verification_level,
+            nullifierHash: finalPayload.nullifier_hash,
+            merkleRoot: finalPayload.merkle_root,
+            proof: finalPayload.proof,
+            verification_level: finalPayload.verification_level,
+            backendVerified: true,
+            verifiedAt: new Date().toISOString(),
+            sessionId: `mofo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          });
+        } else {
+          console.log('❌ Backend verification failed:', verifyResponseJson);
+          setVerificationState('error');
+          setErrorMessage('Backend verification failed. Please try again.');
+        }
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        console.error('💥 Backend verification error:', error);
+        setVerificationState('error');
+        
+        let userMessage = 'Verification failed. Please try again.';
+        if (error.name === 'AbortError') {
+          userMessage = 'Verification timed out. Please check your connection and try again.';
+        } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+          userMessage = 'Connection failed. Please check your internet and try again.';
+        }
+        
+        setErrorMessage(userMessage);
+      }
       
-      // The response will be handled by the event listener
     } catch (error: any) {
       console.error('💥 Verification error:', error);
       setVerificationState('error');
       
-      // Better error messages based on World documentation
+      // Better error messages
       if (error?.message?.includes('action')) {
         setErrorMessage(`Action "${process.env.NEXT_PUBLIC_WLD_ACTION}" not found. Check Developer Portal.`);
-      } else if (error?.message?.includes('signal')) {
-        setErrorMessage('Invalid signal. Please contact support.');
       } else if (error?.message?.includes('MiniKit')) {
         setErrorMessage('Please open this app in World App to continue.');
       } else {
