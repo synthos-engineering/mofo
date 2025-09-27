@@ -1,0 +1,323 @@
+.eeg-visualization {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  margin: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+  border: 1px solid #f1f5f9;
+}
+
+.eeg-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.eeg-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.eeg-icon {
+  font-size: 20px;
+  filter: hue-rotate(320deg) saturate(1.2);
+}
+
+.eeg-title h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: -0.025em;
+}
+
+.eeg-controls {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.time-scale, .window-size {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.time-scale label, .window-size label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.time-scale select, .window-size select {
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 11px;
+  background: #fafafa;
+  min-width: 70px;
+  color: #334155;
+  font-weight: 500;
+}
+
+.eeg-content {
+  display: flex;
+  gap: 24px;
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.channel-labels {
+  min-width: 180px;
+  border-right: 1px solid #e2e8f0;
+  padding-right: 16px;
+}
+
+.channels-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 10px;
+  font-weight: 600;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hardware-settings {
+  font-size: 9px;
+  color: #64748b;
+}
+
+.channel-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  height: 40px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.channel-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 12px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.channel-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.voltage-range {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.voltage-max, .voltage-min {
+  font-size: 10px;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  color: #334155;
+  font-weight: 500;
+}
+
+.channel-status {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rail-status {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.rail-status.not-railed {
+  color: #059669;
+}
+
+.rail-status.railed {
+  color: #dc2626;
+}
+
+.rms-value {
+  font-size: 9px;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+  color: #64748b;
+}
+
+.eeg-graph {
+  flex: 1;
+  position: relative;
+}
+
+.eeg-canvas {
+  width: 100%;
+  height: 320px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #000000;
+  display: block;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.time-axis {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding: 0 10px;
+}
+
+.time-label {
+  font-size: 11px;
+  color: #6c757d;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.time-scale-label {
+  position: absolute;
+  right: 0;
+  bottom: -25px;
+  font-size: 11px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.eeg-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.stream-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.status-indicator.streaming {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.status-indicator.stopped {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s infinite;
+}
+
+.packet-count {
+  font-size: 11px;
+  color: #6c757d;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.timestamp {
+  font-size: 11px;
+  color: #6c757d;
+  font-family: 'Monaco', 'Menlo', monospace;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .eeg-content {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .channel-labels {
+    min-width: unset;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    padding-right: 0;
+    padding-bottom: 12px;
+    margin-bottom: 0;
+  }
+  
+  .channel-info {
+    height: 35px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+  }
+  
+  .eeg-canvas {
+    height: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .eeg-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+  
+  .eeg-controls {
+    align-self: stretch;
+    justify-content: space-around;
+  }
+  
+  .eeg-footer {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+}

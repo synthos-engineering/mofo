@@ -1,0 +1,360 @@
+.App {
+  min-height: 100vh;
+  background: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+  color: #1e293b;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  gap: 24px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.booth-header {
+  background: transparent;
+  padding: 40px 20px 20px;
+  text-align: center;
+}
+
+.brain-icon {
+  font-size: 40px;
+  margin-bottom: 16px;
+  filter: grayscale(0.2);
+}
+
+.booth-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: -0.025em;
+}
+
+.booth-id {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.booth-main {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.status-section {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  color: white;
+  font-weight: 500;
+  font-size: 14px;
+  backdrop-filter: blur(8px);
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.8);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.connected-state {
+  text-align: center;
+  padding: 60px 40px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.connected-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+}
+
+.connected-state h2 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  color: #10B981;
+  font-weight: 600;
+}
+
+.connected-state p {
+  margin: 0 0 32px 0;
+  font-size: 16px;
+  color: #6b7280;
+}
+
+.session-info p {
+  margin: 0;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+/* EEG Session Styles */
+.eeg-session {
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  border: 1px solid #f1f5f9;
+}
+
+.session-header {
+  text-align: center;
+  padding: 20px 24px 16px;
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  color: white;
+  border-radius: 24px 24px 0 0;
+}
+
+.session-header .connected-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.session-header h2 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.connection-status {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.eeg-status {
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+}
+
+.eeg-status.connected {
+  background: rgba(34, 197, 94, 0.25);
+  border-color: rgba(34, 197, 94, 0.4);
+  color: #dcfce7;
+}
+
+.eeg-status.connecting {
+  background: rgba(251, 146, 60, 0.25);
+  border-color: rgba(251, 146, 60, 0.4);
+  color: #fed7aa;
+}
+
+.session-time {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.eeg-connecting {
+  padding: 48px 32px;
+  text-align: center;
+}
+
+.eeg-connecting .loading-spinner {
+  width: 24px;
+  height: 24px;
+  margin: 0 auto 20px;
+}
+
+.eeg-connecting p {
+  margin: 6px 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.eeg-note {
+  font-size: 11px !important;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', monospace !important;
+  color: #94a3b8 !important;
+}
+
+.privacy-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 16px 20px;
+  border-radius: 16px;
+  margin-bottom: 32px;
+  border: 1px solid #e2e8f0;
+}
+
+.privacy-icon {
+  font-size: 20px;
+  margin-top: 2px;
+}
+
+.privacy-content h3 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.privacy-content p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.qr-container {
+  background: white;
+  padding: 48px 32px;
+  border-radius: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  text-align: center;
+  border: 1px solid #f1f5f9;
+}
+
+.qr-container h2 {
+  margin: 0 0 32px 0;
+  font-size: 22px;
+  color: #0f172a;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.qr-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.qr-code {
+  width: 240px;
+  height: 240px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.qr-instructions p {
+  margin: 0;
+  font-size: 15px;
+  color: #334155;
+  font-weight: 500;
+}
+
+.qr-subtitle {
+  font-size: 13px !important;
+  color: #64748b !important;
+  font-weight: 400 !important;
+}
+
+.qr-loading {
+  padding: 60px;
+  color: #6b7280;
+}
+
+.booth-footer {
+  text-align: center;
+  margin-top: 32px;
+  padding: 16px;
+  background: rgba(255,255,255,0.5);
+  border-radius: 16px;
+  border: 1px solid #f1f5f9;
+  backdrop-filter: blur(8px);
+}
+
+.connection-details p {
+  margin: 2px 0;
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Additional modern styling */
+.qr-container .brain-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.privacy-notice:first-of-type {
+  margin-bottom: 12px;
+}
+
+.privacy-notice:last-of-type {
+  margin-bottom: 32px;
+}
+
+/* Improved button-like status indicators */
+.status-indicator {
+  background: linear-gradient(135deg, var(--status-color, #6b7280), var(--status-color-dark, #4b5563));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Loading state improvements */
+.qr-loading {
+  padding: 40px;
+  color: #64748b;
+}
+
+@media (max-width: 768px) {
+  .booth-main {
+    padding: 16px;
+  }
+  
+  .qr-container {
+    padding: 32px 24px;
+  }
+  
+  .qr-code {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .privacy-notice {
+    padding: 12px 16px;
+  }
+  
+  .booth-header {
+    padding: 32px 20px 16px;
+  }
+}
