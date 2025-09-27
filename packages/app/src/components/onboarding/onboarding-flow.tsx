@@ -8,13 +8,35 @@ import { EegCaptureScreen } from './steps/eeg-capture-screen'
 import { AgentConfigurationScreen } from './steps/agent-configuration-screen'
 import { EnsClaimScreen } from './steps/ens-claim-screen'
 import { AgentReadyScreen } from './steps/agent-ready-screen'
+import { useState } from 'react'
 
 interface OnboardingFlowProps {
   authState: AuthState
   onStepComplete: (nextStep: OnboardingStep, updatedState?: Partial<AuthState>) => void
 }
 
+// Enhanced data passing between steps
+interface EegData {
+  loveScore: number
+  sessionId: string
+}
+
+interface AgentData {
+  agentId: string
+  personalityTraits: {
+    openness: number
+    conscientiousness: number
+    extraversion: number
+    agreeableness: number
+    neuroticism: number
+    communication_style: string
+  }
+}
+
 export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProps) {
+  // State to pass data between onboarding steps
+  const [eegData, setEegData] = useState<EegData | null>(null)
+  const [agentData, setAgentData] = useState<AgentData | null>(null)
   const renderStep = () => {
     switch (authState.currentStep) {
       case 'splash':
@@ -46,14 +68,23 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
       case 'eeg-capture':
         return (
           <EegCaptureScreen 
-            onComplete={() => onStepComplete('agent-configuration')} 
+            userId={authState.walletAddress || undefined}
+            onComplete={(loveScore, sessionId) => {
+              setEegData({ loveScore, sessionId })
+              onStepComplete('agent-configuration')
+            }} 
           />
         )
       
       case 'agent-configuration':
         return (
           <AgentConfigurationScreen 
-            onComplete={() => onStepComplete('ens-claim')} 
+            userId={authState.walletAddress || undefined}
+            eegData={eegData || undefined}
+            onComplete={(agentCreationData) => {
+              setAgentData(agentCreationData)
+              onStepComplete('ens-claim')
+            }} 
           />
         )
       

@@ -5,22 +5,33 @@ import { motion } from 'framer-motion'
 import { Brain, ChevronLeft, Shield } from 'lucide-react'
 
 interface EegCaptureScreenProps {
-  onComplete: () => void
+  onComplete: (loveScore: number, sessionId: string) => void  // Enhanced to return EEG data
+  userId?: string  // Required for session management
 }
 
-export function EegCaptureScreen({ onComplete }: EegCaptureScreenProps) {
+export function EegCaptureScreen({ onComplete, userId }: EegCaptureScreenProps) {
   const [progress, setProgress] = useState(0)
   const [isCapturing, setIsCapturing] = useState(false)
 
   const startCapture = () => {
     setIsCapturing(true)
     
-    // Simulate EEG capture progress
+    // Enhanced EEG capture simulation - now generates session data
+    const sessionId = `eeg_${userId || 'demo'}_${Date.now()}`
+    console.log('🧠 Starting EEG capture session:', sessionId)
+    
     const interval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval)
-          setTimeout(onComplete, 500)
+          
+          // Generate simulated love score (in real app, this comes from EEG analysis)
+          const loveScore = Math.floor(Math.random() * 30) + 70 // 70-100 range
+          console.log('💖 EEG capture complete - Love Score:', loveScore)
+          
+          setTimeout(() => {
+            onComplete(loveScore, sessionId) // Pass data to next step
+          }, 500)
           return 100
         }
         return prev + 1

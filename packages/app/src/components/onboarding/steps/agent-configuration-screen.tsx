@@ -5,15 +5,31 @@ import { motion } from 'framer-motion'
 import { Brain, ChevronLeft, RotateCcw, Info } from 'lucide-react'
 
 interface AgentConfigurationScreenProps {
-  onComplete: () => void
+  onComplete: (agentData: {
+    agentId: string
+    personalityTraits: {
+      openness: number
+      conscientiousness: number
+      extraversion: number
+      agreeableness: number
+      neuroticism: number
+      communication_style: string
+    }
+  }) => void  // Enhanced to return agent creation data
+  userId?: string  // Required for agent creation
+  eegData?: {      // EEG data from previous step
+    loveScore: number
+    sessionId: string
+  }
 }
 
-export function AgentConfigurationScreen({ onComplete }: AgentConfigurationScreenProps) {
+export function AgentConfigurationScreen({ onComplete, userId, eegData }: AgentConfigurationScreenProps) {
+  // Enhanced with EEG-derived traits
   const [traits, setTraits] = useState({
-    openness: 72,
-    conscientiousness: 85,
-    extraversion: 45,
-    agreeableness: 68
+    openness: eegData?.loveScore ? Math.min(eegData.loveScore + 20, 100) : 72,
+    conscientiousness: eegData?.loveScore ? Math.min(eegData.loveScore + 30, 100) : 85,
+    extraversion: eegData?.loveScore ? Math.max(eegData.loveScore - 10, 10) : 45,
+    agreeableness: eegData?.loveScore ? Math.min(eegData.loveScore + 8, 100) : 68
   })
 
   const [previewText, setPreviewText] = useState(
@@ -76,15 +92,23 @@ export function AgentConfigurationScreen({ onComplete }: AgentConfigurationScree
           </p>
         </div>
 
-        {/* EEG Info Box */}
+        {/* EEG Data Info Box */}
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
           <div className="flex items-start space-x-3">
             <Info className="w-5 h-5 text-blue-600 mt-0.5" />
             <div>
               <div className="font-medium text-blue-800 mb-1">EEG-Derived Traits</div>
-              <div className="text-sm text-blue-700">
+              <div className="text-sm text-blue-700 mb-2">
                 These personality dimensions were automatically calculated from your brainwave patterns. You can adjust them to better represent how you want your agent to behave.
               </div>
+              {eegData && (
+                <div className="bg-white border border-blue-200 rounded-lg p-3 mt-2">
+                  <div className="text-xs text-blue-800">
+                    <div>💖 Love Score: {eegData.loveScore}/100</div>
+                    <div>🧠 Session: {eegData.sessionId}</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -217,7 +241,24 @@ export function AgentConfigurationScreen({ onComplete }: AgentConfigurationScree
 
         {/* Create Agent Button */}
         <button
-          onClick={onComplete}
+          onClick={() => {
+            // Enhanced agent creation with EEG data
+            const agentData = {
+              agentId: `agent_${userId || 'demo'}_${Date.now()}`,
+              personalityTraits: {
+                openness: traits.openness / 100,
+                conscientiousness: traits.conscientiousness / 100,
+                extraversion: traits.extraversion / 100,
+                agreeableness: traits.agreeableness / 100,
+                neuroticism: 0.3, // Default neuroticism
+                communication_style: traits.extraversion > 50 ? 'casual' : 'analytical'
+              }
+            }
+            
+            console.log('🤖 Creating agent with data:', agentData)
+            console.log('🧠 Using EEG session:', eegData?.sessionId)
+            onComplete(agentData)
+          }}
           className="w-full bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg"
         >
           Create My Agent
