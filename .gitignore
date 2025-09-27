@@ -52,3 +52,4 @@ datasets/
 # Database
 *.db
 *.sqlite
+packages/app-reference/**
