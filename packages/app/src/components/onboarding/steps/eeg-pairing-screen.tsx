@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, X } from 'lucide-react'
+import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react'
 import { MiniKit } from '@worldcoin/minikit-js'
 import jsQR from 'jsqr'
 
@@ -10,248 +10,115 @@ interface EegPairingScreenProps {
   onComplete: () => void
 }
 
-interface QRCodeData {
-  station_id: string
-  websocket_url: string
-  hardware_type: string
-  channels: number
-}
-
 export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
-  const [isScanning, setIsScanning] = useState(false)
-  const [isStartingCamera, setIsStartingCamera] = useState(false)
-  const [scanResult, setScanResult] = useState<QRCodeData | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [extractedUrl, setExtractedUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [debugInfo, setDebugInfo] = useState<string>('')
-  const [showFileInput, setShowFileInput] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const startCamera = useCallback(async () => {
+  const processImage = async (file: File) => {
+    setIsProcessing(true)
+    setError(null)
+
     try {
-      setError(null)
-      setIsStartingCamera(true)
-      console.log('Starting camera...')
+      // Create image preview
+      const imageUrl = URL.createObjectURL(file)
+      setCapturedImage(imageUrl)
 
-      // Request camera access - try back camera first, then front camera
-      let stream: MediaStream | null = null
-      
-      try {
-        // Try back camera first
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment',
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          }
-        })
-        console.log('Back camera accessed successfully')
-      } catch (backCameraError) {
-        console.log('Back camera failed, trying front camera:', backCameraError)
-        // Fallback to front camera
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          }
-        })
-        console.log('Front camera accessed successfully')
-      }
+      // Create image element for processing
+      const img = new Image()
+      img.onload = () => {
+        if (!canvasRef.current) return
 
-      if (!stream) {
-        throw new Error('No camera stream available')
-      }
+        const canvas = canvasRef.current
+        const context = canvas.getContext('2d')
+        if (!context) return
 
-      streamRef.current = stream
-      console.log('Camera stream tracks:', stream.getVideoTracks())
+        // Set canvas dimensions to image dimensions
+        canvas.width = img.width
+        canvas.height = img.height
 
-      if (videoRef.current) {
-        console.log('Setting up video element...')
-        const video = videoRef.current
-        
-        // Set the stream
-        video.srcObject = stream
-        
-        // Set up event handlers
-        video.onloadedmetadata = () => {
-          const info = `Video loaded: ${video.videoWidth}x${video.videoHeight}`
-          console.log(info)
-          setDebugInfo(info)
-          setIsStartingCamera(false)
-          setIsScanning(true)
-        }
+        // Draw image to canvas
+        context.drawImage(img, 0, 0)
 
-        video.onplaying = () => {
-          const info = `Video playing: Ready for QR scanning`
-          console.log(info)
-          setDebugInfo(info)
-          // Start QR scanning once video is actually playing
-          setTimeout(() => {
-            startQRScanning()
-          }, 500)
-        }
-
-        video.onpause = () => {
-          console.log('Video paused')
-          setDebugInfo('Video paused')
-        }
-
-        video.onended = () => {
-          console.log('Video ended')
-          setDebugInfo('Video ended')
-        }
-
-        video.onerror = (e) => {
-          const errorInfo = `Video error: ${e}`
-          console.error(errorInfo)
-          setDebugInfo(errorInfo)
-          setError('Video playback failed')
-          setIsStartingCamera(false)
-          setIsScanning(false)
-        }
-
-        // Start playback
-        const playPromise = video.play()
-        if (playPromise !== undefined) {
-          playPromise.catch(err => {
-            console.error('Play failed:', err)
-            setError('Camera preview failed to start')
-            setIsStartingCamera(false)
-            setIsScanning(false)
-          })
-        }
-      }
-
-      // Send haptic feedback
-      if (MiniKit.isInstalled()) {
-        MiniKit.commands.sendHapticFeedback({
-          hapticsType: 'impact',
-          style: 'light',
-        })
-      }
-    } catch (err) {
-      console.error('Camera setup failed:', err)
-      setError(`Camera access failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
-      setIsStartingCamera(false)
-      setIsScanning(false)
-      
-      if (MiniKit.isInstalled()) {
-        MiniKit.commands.sendHapticFeedback({
-          hapticsType: 'notification',
-          style: 'error',
-        })
-      }
-    }
-  }, [])
-
-  const startQRScanning = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return
-
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    const context = canvas.getContext('2d')
-
-    if (!context) return
-
-    scanIntervalRef.current = setInterval(() => {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
+        // Get image data for QR processing
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+        
+        // Scan for QR code
         const qrCode = jsQR(imageData.data, imageData.width, imageData.height)
 
         if (qrCode) {
           console.log('QR Code detected:', qrCode.data)
+          setExtractedUrl(qrCode.data)
           
-          try {
-            // Try to parse as JSON (for EEG station data)
-            const qrData = JSON.parse(qrCode.data) as QRCodeData
-            setScanResult(qrData)
-            stopCamera()
-            
-            // Send success haptic
-            if (MiniKit.isInstalled()) {
-              MiniKit.commands.sendHapticFeedback({
-                hapticsType: 'notification',
-                style: 'success',
-              })
-            }
-
-            // Complete pairing after brief delay
-            setTimeout(() => {
-              onComplete()
-            }, 1500)
-          } catch (jsonError) {
-            // If not JSON, treat as URL or plain text
-            console.log('QR contains URL/text:', qrCode.data)
-            
-            // For demo, accept any QR code as valid
-            setScanResult({
-              station_id: 'eeg_station_001',
-              websocket_url: qrCode.data,
-              hardware_type: 'OpenBCI_Cyton',
-              channels: 8
+          // Send success haptic
+          if (MiniKit.isInstalled()) {
+            MiniKit.commands.sendHapticFeedback({
+              hapticsType: 'notification',
+              style: 'success',
             })
-            stopCamera()
-            
-            if (MiniKit.isInstalled()) {
-              MiniKit.commands.sendHapticFeedback({
-                hapticsType: 'notification',
-                style: 'success',
-              })
-            }
-
-            setTimeout(() => {
-              onComplete()
-            }, 1500)
+          }
+        } else {
+          setError('No QR code found in the image. Please try again with a clearer photo.')
+          
+          // Send error haptic
+          if (MiniKit.isInstalled()) {
+            MiniKit.commands.sendHapticFeedback({
+              hapticsType: 'notification',
+              style: 'error',
+            })
           }
         }
+        
+        setIsProcessing(false)
+        
+        // Cleanup
+        URL.revokeObjectURL(imageUrl)
       }
-    }, 100) // Check for QR codes every 100ms
-  }, [onComplete])
 
-  const stopCamera = useCallback(() => {
-    console.log('Stopping camera...')
-    
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current)
-      scanIntervalRef.current = null
+      img.onerror = () => {
+        setError('Failed to process the image. Please try again.')
+        setIsProcessing(false)
+        URL.revokeObjectURL(imageUrl)
+      }
+
+      img.src = imageUrl
+    } catch (err) {
+      console.error('Image processing failed:', err)
+      setError('Failed to process the image. Please try again.')
+      setIsProcessing(false)
     }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        console.log('Stopping track:', track.label)
-        track.stop()
-      })
-      streamRef.current = null
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
-
-    setIsScanning(false)
-    setIsStartingCamera(false)
-  }, [])
-
-  const handleRetry = () => {
-    setError(null)
-    setScanResult(null)
-    startCamera()
   }
 
-  useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      stopCamera()
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      console.log('Image captured:', file.name, file.size, 'bytes')
+      processImage(file)
     }
-  }, [stopCamera])
+  }
+
+  const handleContinue = () => {
+    // Send haptic feedback
+    if (MiniKit.isInstalled()) {
+      MiniKit.commands.sendHapticFeedback({
+        hapticsType: 'impact',
+        style: 'medium',
+      })
+    }
+    onComplete()
+  }
+
+  const resetScan = () => {
+    setExtractedUrl(null)
+    setError(null)
+    setCapturedImage(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -264,13 +131,13 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col px-6 pt-6">
+      <div className="flex-1 flex flex-col px-6 pt-6 pb-6">
         {/* Header */}
         <div className="text-center mb-8">
           <Brain className="w-12 h-12 text-gray-800 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Connect Your EEG Device</h1>
           <p className="text-gray-600 text-sm max-w-sm mx-auto">
-            Scan the QR code on your EEG station to establish a secure connection
+            Take a photo of the QR code on your EEG station to establish a secure connection
           </p>
         </div>
 
@@ -287,131 +154,42 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
           </div>
         </div>
 
-        {/* Camera/Scanning Section */}
+        {/* Photo/QR Display Section */}
         <div className="flex-1 flex flex-col">
           <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-2">
-                <Camera className="w-5 h-5 text-gray-600" />
-                <span className="font-medium text-gray-800">
-                  {isScanning ? 'Scanning for QR Code' : scanResult ? 'QR Code Found' : 'EEG Station QR Code'}
-                </span>
-              </div>
-              {isScanning && (
-                <button
-                  onClick={stopCamera}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+            <div className="flex items-center space-x-2 mb-4">
+              <Camera className="w-5 h-5 text-gray-600" />
+              <span className="font-medium text-gray-800">
+                {extractedUrl ? 'QR Code Processed' : 'EEG Station QR Code'}
+              </span>
             </div>
 
-            {/* Camera Feed / QR Display */}
-            <div className="relative rounded-lg overflow-hidden bg-black w-full" style={{ height: '320px' }}>
-              {isStartingCamera ? (
-                /* Starting Camera State */
-                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900">
-                  <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mb-4"></div>
-                  <div className="text-white text-sm font-medium mb-1">Starting Camera...</div>
-                  <div className="text-gray-300 text-xs">Please allow camera access</div>
-                </div>
-              ) : isScanning ? (
-                <>
-                  {/* Live Camera Feed */}
-                  <video
-                    ref={videoRef}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    playsInline
-                    muted
-                    autoPlay
-                    controls={false}
-                    webkit-playsinline="true"
-                    style={{ 
-                      backgroundColor: '#000',
-                      objectFit: 'cover',
-                      width: '100%',
-                      height: '100%'
-                    }}
+            {/* Image/QR Display */}
+            <div className="relative rounded-lg overflow-hidden bg-gray-100" style={{ height: '320px' }}>
+              {capturedImage ? (
+                /* Captured Image */
+                <div className="relative w-full h-full">
+                  <img
+                    src={capturedImage}
+                    alt="Captured QR Code"
+                    className="w-full h-full object-contain bg-gray-900"
                   />
-                  
-                  {/* Scanning Overlay */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="relative">
-                      {/* Corner brackets */}
-                      <div className="w-48 h-48 relative">
-                        {/* Top-left corner */}
-                        <div className="absolute top-0 left-0 w-8 h-8 border-l-4 border-t-4 border-blue-400"></div>
-                        {/* Top-right corner */}
-                        <div className="absolute top-0 right-0 w-8 h-8 border-r-4 border-t-4 border-blue-400"></div>
-                        {/* Bottom-left corner */}
-                        <div className="absolute bottom-0 left-0 w-8 h-8 border-l-4 border-b-4 border-blue-400"></div>
-                        {/* Bottom-right corner */}
-                        <div className="absolute bottom-0 right-0 w-8 h-8 border-r-4 border-b-4 border-blue-400"></div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Debug Info - for troubleshooting */}
-                  {debugInfo && (
-                    <div className="absolute top-4 left-4">
-                      <div className="bg-black/80 text-white px-2 py-1 rounded text-xs font-mono">
-                        {debugInfo}
+                  {isProcessing && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <div className="bg-white rounded-lg p-4 text-center">
+                        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        <div className="text-sm font-medium">Processing QR Code...</div>
                       </div>
                     </div>
                   )}
-
-                  {/* Scanning Instructions */}
-                  <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
-                    <div className="bg-black/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                      🎯 Align QR code within frame
-                    </div>
-                  </div>
-
-                  {/* Stop scanning button */}
-                  <div className="absolute top-4 right-4">
-                    <button
-                      onClick={stopCamera}
-                      className="bg-black/60 text-white p-2 rounded-full hover:bg-black/80"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                </>
-              ) : scanResult ? (
-                /* Success State */
-                <div className="w-full h-full flex flex-col items-center justify-center bg-green-50">
-                  <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
-                  <div className="text-lg font-semibold text-green-800 mb-2">QR Code Detected!</div>
-                  <div className="text-sm text-green-600 text-center max-w-xs">
-                    Connected to: {scanResult.station_id}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-2">
-                    Hardware: {scanResult.hardware_type}
-                  </div>
-                </div>
-              ) : error ? (
-                /* Error State */
-                <div className="w-full h-full flex flex-col items-center justify-center bg-red-50">
-                  <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
-                  <div className="text-lg font-semibold text-red-800 mb-2">Camera Error</div>
-                  <div className="text-sm text-red-600 text-center max-w-xs mb-4 px-4">
-                    {error}
-                  </div>
-                  <button
-                    onClick={handleRetry}
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700"
-                  >
-                    Try Again
-                  </button>
                 </div>
               ) : (
-                /* Placeholder State */
+                /* Placeholder */
                 <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 bg-gray-50">
                   <Camera className="w-16 h-16 text-gray-400 mb-4" />
                   <div className="text-sm text-gray-500 text-center">
-                    <div className="font-medium mb-1">Ready to scan</div>
-                    <div>Tap button below to start camera</div>
+                    <div className="font-medium mb-1">Ready to capture QR code</div>
+                    <div>Tap button below to take photo</div>
                   </div>
                 </div>
               )}
@@ -421,95 +199,107 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             <canvas ref={canvasRef} className="hidden" />
           </div>
 
-          {/* Instructions */}
-          {!isScanning && !scanResult && !error && (
-            <div className="text-center mb-6">
-              <div className="font-medium text-gray-800 mb-1">Look for this QR code on your EEG station</div>
-              <div className="text-sm text-gray-500">The QR code should be visible on the station's display</div>
-            </div>
+          {/* Extracted URL Display */}
+          {extractedUrl && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-green-50 border border-green-100 rounded-xl p-4 mb-6"
+            >
+              <div className="flex items-start space-x-3">
+                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-medium text-green-800 mb-2">QR Code URL Extracted:</div>
+                  <div className="bg-white border border-green-200 rounded-lg p-3 mb-3">
+                    <div className="flex items-start space-x-2">
+                      <ExternalLink className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm font-mono text-blue-800 break-all">
+                        {extractedUrl}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-sm text-green-700">
+                    This URL will be used to connect to your EEG station.
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Error Display */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-red-50 border border-red-100 rounded-xl p-4 mb-6"
+            >
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                <div>
+                  <div className="font-medium text-red-800 mb-1">Scan Failed</div>
+                  <div className="text-sm text-red-700">{error}</div>
+                </div>
+              </div>
+            </motion.div>
           )}
 
           {/* Action Buttons */}
           <div className="space-y-4">
-            {!isScanning && !scanResult && !error && !isStartingCamera && (
+            {!extractedUrl && (
               <div className="space-y-3">
                 <button
-                  onClick={startCamera}
-                  className="w-full bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center space-x-2 hover:bg-gray-800 transition-colors"
-                >
-                  <Camera className="w-5 h-5" />
-                  <span>Start Live Camera Scan</span>
-                </button>
-                
-                <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-medium shadow-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
+                  disabled={isProcessing}
+                  className="w-full bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center space-x-2 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Camera className="w-4 h-4" />
-                  <span>Take Photo to Scan QR</span>
+                  {isProcessing ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5" />
+                      <span>Take Photo of QR Code</span>
+                    </>
+                  )}
                 </button>
-                
-                {/* Hidden file input for camera capture */}
+
+                {/* Hidden file input */}
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   capture="environment"
                   className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      // Process image file for QR code
-                      console.log('Image captured:', file.name)
-                      // For now, simulate success
-                      setScanResult({
-                        station_id: 'captured_station',
-                        websocket_url: 'ws://captured.mofo.eth:8765',
-                        hardware_type: 'Photo_Scan',
-                        channels: 8
-                      })
-                    }
-                  }}
+                  onChange={handleFileChange}
                 />
-                
-                {/* Debug info display */}
-                {debugInfo && (
-                  <div className="bg-gray-100 border border-gray-200 rounded-lg p-3">
-                    <div className="text-xs text-gray-600 font-mono">{debugInfo}</div>
-                  </div>
+
+                {(error || capturedImage) && (
+                  <button
+                    onClick={resetScan}
+                    className="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-300 transition-colors"
+                  >
+                    Take New Photo
+                  </button>
                 )}
               </div>
             )}
 
-            {isStartingCamera && (
-              <button
-                disabled
-                className="w-full bg-gray-600 text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center space-x-2 cursor-not-allowed opacity-75"
-              >
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>Starting Camera...</span>
-              </button>
-            )}
-
-            {scanResult && (
-              <div className="space-y-4">
-                <div className="bg-green-50 border border-green-100 rounded-xl p-4">
-                  <div className="text-sm text-green-700">
-                    <div className="font-medium mb-2">🔗 Connection Established:</div>
-                    <div className="space-y-1">
-                      <div>• Station: {scanResult.station_id}</div>
-                      <div>• Hardware: {scanResult.hardware_type}</div>
-                      <div>• Channels: {scanResult.channels}</div>
-                      <div>• URL: {scanResult.websocket_url}</div>
-                    </div>
-                  </div>
-                </div>
-                
+            {extractedUrl && (
+              <div className="space-y-3">
                 <button
-                  onClick={onComplete}
+                  onClick={handleContinue}
                   className="w-full bg-green-600 text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg hover:bg-green-700 transition-colors"
                 >
-                  ✅ Continue to EEG Capture
+                  ✅ Connect to EEG Station
+                </button>
+                
+                <button
+                  onClick={resetScan}
+                  className="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-300 transition-colors"
+                >
+                  Scan Different QR Code
                 </button>
               </div>
             )}
