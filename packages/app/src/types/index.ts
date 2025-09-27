@@ -8,34 +8,55 @@ export interface User {
   isVerified: boolean
   interests: string[]
   location: string
+  ensName?: string
+  personalityTraits?: PersonalityTraits
 }
 
-export interface Match {
+export interface PersonalityTraits {
+  openness: number
+  conscientiousness: number
+  extraversion: number
+  agreeableness: number
+  neuroticism: number
+}
+
+export interface Agent {
   id: string
-  userId: string
-  matchedUserId: string
-  timestamp: Date
+  name: string
+  ensName: string
+  personalityTraits: PersonalityTraits
   isActive: boolean
-}
-
-export interface Message {
-  id: string
-  matchId: string
-  senderId: string
-  content: string
-  timestamp: Date
-  isRead: boolean
-}
-
-export interface SwipeAction {
   userId: string
-  targetUserId: string
-  action: 'like' | 'dislike'
-  timestamp: Date
+  createdAt: Date
+}
+
+export interface AgentDate {
+  id: string
+  agentId: string
+  matchedAgentId: string
+  compatibilityScore: number
+  status: 'proposed' | 'coordinating' | 'agreed' | 'completed'
+  proposedDate?: Date
+  proposedVenue?: string
+  stakeAmount?: number
+  createdAt: Date
 }
 
 export interface AuthState {
   isAuthenticated: boolean
   walletAddress: string | null
   user: User | null
+  currentStep: OnboardingStep
 }
+
+export type OnboardingStep = 
+  | 'splash'
+  | 'worldid-verification' 
+  | 'verification-complete'
+  | 'eeg-pairing'
+  | 'eeg-capture'
+  | 'agent-configuration'
+  | 'ens-claim'
+  | 'agent-ready'
+  | 'dating-hub'
+  | 'completed'
