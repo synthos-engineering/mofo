@@ -297,7 +297,7 @@ export default function HomePage() {
           <p className="italic">
             Mofo • Privacy-first dating with AI agents •{' '}
             <a
-              href="https://github.com/mofo"
+              href="https://github.com/0xYudhishthra/mofo"
               target="_blank"
               rel="noopener noreferrer"
               className="underline hover:text-black"
