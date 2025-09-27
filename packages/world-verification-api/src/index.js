@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { worldIdRoutes } from './routes/worldid.js';
+import { authRoutes } from './routes/auth.js';
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/worldid', worldIdRoutes);
+app.use('/api/auth', authRoutes);
 
 // Error handling
 app.use((err, req, res, next) => {
