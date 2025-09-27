@@ -13,23 +13,31 @@ import {
 export function Toaster() {
   const { toasts } = useToast();
 
+  const Component = ToastProvider as any;
   return (
-    <ToastProvider>
+    <Component>
       {toasts.map(function ({ id, title, description, action, ...props }) {
+        const ToastComponent = Toast as any;
+        const TitleComponent = ToastTitle as any;
+        const DescriptionComponent = ToastDescription as any;
+        const CloseComponent = ToastClose as any;
         return (
-          <Toast key={id} {...props}>
+          <ToastComponent key={id} {...props}>
             <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
+              {title && <TitleComponent>{title}</TitleComponent>}
               {description && (
-                <ToastDescription>{description}</ToastDescription>
+                <DescriptionComponent>{description}</DescriptionComponent>
               )}
             </div>
             {action}
-            <ToastClose />
-          </Toast>
+            <CloseComponent />
+          </ToastComponent>
         );
       })}
-      <ToastViewport />
-    </ToastProvider>
+      {(() => {
+        const ViewportComponent = ToastViewport as any;
+        return <ViewportComponent />;
+      })()}
+    </Component>
   );
 }

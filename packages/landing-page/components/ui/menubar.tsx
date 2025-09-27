@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 function Menubar({
   className,
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Root>) {
+}: any) {
   return (
     <MenubarPrimitive.Root
       data-slot="menubar"
@@ -24,25 +24,28 @@ function Menubar({
 
 function MenubarMenu({
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Menu>) {
-  return <MenubarPrimitive.Menu data-slot="menubar-menu" {...props} />;
+}: any) {
+  const ComponentMenubarPrimitiveMenu = MenubarPrimitive.Menu as any;
+  return <ComponentMenubarPrimitiveMenu data-slot="menubar-menu" {...props} />;
 }
 
 function MenubarGroup({
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Group>) {
-  return <MenubarPrimitive.Group data-slot="menubar-group" {...props} />;
+}: any) {
+  const ComponentMenubarPrimitiveGroup = MenubarPrimitive.Group as any;
+  return <ComponentMenubarPrimitiveGroup data-slot="menubar-group" {...props} />;
 }
 
 function MenubarPortal({
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Portal>) {
-  return <MenubarPrimitive.Portal data-slot="menubar-portal" {...props} />;
+}: any) {
+  const ComponentMenubarPrimitivePortal = MenubarPrimitive.Portal as any;
+  return <ComponentMenubarPrimitivePortal data-slot="menubar-portal" {...props} />;
 }
 
 function MenubarRadioGroup({
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.RadioGroup>) {
+}: any) {
   return (
     <MenubarPrimitive.RadioGroup data-slot="menubar-radio-group" {...props} />
   );
@@ -51,7 +54,7 @@ function MenubarRadioGroup({
 function MenubarTrigger({
   className,
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Trigger>) {
+}: any) {
   return (
     <MenubarPrimitive.Trigger
       data-slot="menubar-trigger"
@@ -70,7 +73,7 @@ function MenubarContent({
   alignOffset = -4,
   sideOffset = 8,
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Content>) {
+}: any) {
   return (
     <MenubarPortal>
       <MenubarPrimitive.Content
@@ -93,7 +96,7 @@ function MenubarItem({
   inset,
   variant = 'default',
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Item> & {
+}: any & {
   inset?: boolean;
   variant?: 'default' | 'destructive';
 }) {
@@ -116,7 +119,7 @@ function MenubarCheckboxItem({
   children,
   checked,
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.CheckboxItem>) {
+}: any) {
   return (
     <MenubarPrimitive.CheckboxItem
       data-slot="menubar-checkbox-item"
@@ -141,7 +144,7 @@ function MenubarRadioItem({
   className,
   children,
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.RadioItem>) {
+}: any) {
   return (
     <MenubarPrimitive.RadioItem
       data-slot="menubar-radio-item"
@@ -165,7 +168,7 @@ function MenubarLabel({
   className,
   inset,
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Label> & {
+}: any & {
   inset?: boolean;
 }) {
   return (
@@ -184,7 +187,7 @@ function MenubarLabel({
 function MenubarSeparator({
   className,
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Separator>) {
+}: any) {
   return (
     <MenubarPrimitive.Separator
       data-slot="menubar-separator"
@@ -212,8 +215,9 @@ function MenubarShortcut({
 
 function MenubarSub({
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.Sub>) {
-  return <MenubarPrimitive.Sub data-slot="menubar-sub" {...props} />;
+}: any) {
+  const ComponentMenubarPrimitiveSub = MenubarPrimitive.Sub as any;
+  return <ComponentMenubarPrimitiveSub data-slot="menubar-sub" {...props} />;
 }
 
 function MenubarSubTrigger({
@@ -221,7 +225,7 @@ function MenubarSubTrigger({
   inset,
   children,
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.SubTrigger> & {
+}: any & {
   inset?: boolean;
 }) {
   return (
@@ -243,7 +247,7 @@ function MenubarSubTrigger({
 function MenubarSubContent({
   className,
   ...props
-}: React.ComponentProps<typeof MenubarPrimitive.SubContent>) {
+}: any) {
   return (
     <MenubarPrimitive.SubContent
       data-slot="menubar-sub-content"

@@ -10,7 +10,7 @@ function InputOTP({
   className,
   containerClassName,
   ...props
-}: React.ComponentProps<typeof OTPInput> & {
+}: any & {
   containerClassName?: string;
 }) {
   return (
@@ -43,8 +43,8 @@ function InputOTPSlot({
 }: React.ComponentProps<'div'> & {
   index: number;
 }) {
-  const inputOTPContext = React.useContext(OTPInputContext);
-  const { char, hasFakeCaret, isActive } = inputOTPContext?.slots[index] ?? {};
+  const inputOTPContext = React.useContext(OTPInputContext as any);
+  const { char, hasFakeCaret, isActive } = (inputOTPContext as any)?.slots[index] ?? {};
 
   return (
     <div
