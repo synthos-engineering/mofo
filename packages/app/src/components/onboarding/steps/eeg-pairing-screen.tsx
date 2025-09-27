@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react'
 import { MiniKit } from '@worldcoin/minikit-js'
-import jsQR from 'jsqr'
+import QrScanner from 'qr-scanner'
 
 interface EegPairingScreenProps {
   onComplete: () => void
@@ -16,98 +16,61 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const [error, setError] = useState<string | null>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const processImage = async (file: File) => {
     setIsProcessing(true)
     setError(null)
 
     try {
+      console.log('🖼️ Processing image:', file.name, file.size, 'bytes', file.type)
+      
       // Create image preview
       const imageUrl = URL.createObjectURL(file)
       setCapturedImage(imageUrl)
 
-      // Create image element for processing
-      const img = new Image()
-      img.onload = () => {
-        if (!canvasRef.current) return
-
-        const canvas = canvasRef.current
-        const context = canvas.getContext('2d')
-        if (!context) return
-
-        console.log('Processing image - Original dimensions:', img.width, 'x', img.height)
-
-        // Set canvas dimensions to image dimensions
-        canvas.width = img.width
-        canvas.height = img.height
-
-        // Draw image to canvas
-        context.drawImage(img, 0, 0)
-
-        // Get image data for QR processing
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-        console.log('Canvas image data ready:', imageData.width, 'x', imageData.height, 'pixels')
-        
-        // Try multiple QR detection methods
-        let qrCode = null
-        
-        console.log('🔍 Attempting QR detection method 1: Standard scan...')
-        qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert'
+      // Use QrScanner - much more robust than jsQR
+      console.log('🔍 Starting QR detection with QrScanner...')
+      
+      try {
+        const result = await QrScanner.scanImage(file, {
+          returnDetailedScanResult: true,
         })
+
+        console.log('✅ QR Code successfully detected!')
+        console.log('📄 QR Code data:', result.data)
+        console.log('📍 QR Code corner points:', result.cornerPoints)
         
-        if (!qrCode) {
-          console.log('🔍 Attempting QR detection method 2: Inverted colors...')
-          qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: 'onlyInvert'
+        setExtractedUrl(result.data)
+        
+        // Send success haptic
+        if (MiniKit.isInstalled()) {
+          MiniKit.commands.sendHapticFeedback({
+            hapticsType: 'notification',
+            style: 'success',
           })
         }
-
-        if (!qrCode) {
-          console.log('🔍 Attempting QR detection method 3: Both inversion attempts...')
-          qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: 'attemptBoth'
-          })
-        }
-
-        // Try with scaled down image if original is too large
-        if (!qrCode && Math.max(img.width, img.height) > 1200) {
-          console.log('🔍 Attempting QR detection method 4: Scaled down image...')
-          const scale = 800 / Math.max(img.width, img.height)
-          const scaledWidth = Math.floor(img.width * scale)
-          const scaledHeight = Math.floor(img.height * scale)
+        
+      } catch (qrError) {
+        console.log('❌ Detailed scan failed, trying simple scan...')
+        
+        try {
+          // Fallback to simple scan
+          const simpleResult = await QrScanner.scanImage(file)
+          console.log('✅ Simple QR scan succeeded:', simpleResult)
+          setExtractedUrl(simpleResult)
           
-          canvas.width = scaledWidth
-          canvas.height = scaledHeight
-          context.drawImage(img, 0, 0, scaledWidth, scaledHeight)
-          
-          const scaledImageData = context.getImageData(0, 0, scaledWidth, scaledHeight)
-          console.log('Scaled image data:', scaledWidth, 'x', scaledHeight)
-          qrCode = jsQR(scaledImageData.data, scaledImageData.width, scaledImageData.height, {
-            inversionAttempts: 'attemptBoth'
-          })
-        }
-
-        if (qrCode) {
-          console.log('✅ QR Code successfully detected!')
-          console.log('📄 QR Code data:', qrCode.data)
-          console.log('📍 QR Code location:', qrCode.location)
-          setExtractedUrl(qrCode.data)
-          
-          // Send success haptic
           if (MiniKit.isInstalled()) {
             MiniKit.commands.sendHapticFeedback({
               hapticsType: 'notification',
               style: 'success',
             })
           }
-        } else {
-          console.log('❌ No QR code detected with any method')
-          console.log('📊 Image stats - Width:', img.width, 'Height:', img.height, 'Type:', file.type)
-          setError('No QR code found. Please ensure the QR code is clearly visible, well-lit, and takes up a good portion of the photo.')
+        } catch (simpleError) {
+          console.error('❌ All QR detection methods failed')
+          console.error('Detailed error:', qrError)
+          console.error('Simple error:', simpleError)
+          setError('No QR code found. Please take a clearer photo with the QR code clearly visible and well-lit.')
           
-          // Send error haptic
           if (MiniKit.isInstalled()) {
             MiniKit.commands.sendHapticFeedback({
               hapticsType: 'notification',
@@ -115,22 +78,15 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             })
           }
         }
-        
-        setIsProcessing(false)
-        
-        // Cleanup
-        URL.revokeObjectURL(imageUrl)
       }
+      
+      setIsProcessing(false)
+      
+      // Cleanup
+      URL.revokeObjectURL(imageUrl)
 
-      img.onerror = () => {
-        setError('Failed to process the image. Please try again.')
-        setIsProcessing(false)
-        URL.revokeObjectURL(imageUrl)
-      }
-
-      img.src = imageUrl
     } catch (err) {
-      console.error('Image processing failed:', err)
+      console.error('🚨 Image processing failed:', err)
       setError('Failed to process the image. Please try again.')
       setIsProcessing(false)
     }
@@ -139,7 +95,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      console.log('Image captured:', file.name, file.size, 'bytes')
+      console.log('📷 Image captured:', file.name, file.size, 'bytes')
       processImage(file)
     }
   }
@@ -191,10 +147,10 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             <div className="text-sm text-yellow-800">
               <div className="font-medium mb-2">📸 Photo Tips for Best Results:</div>
               <div className="space-y-1 text-yellow-700">
-                <div>• Hold phone steady and close to QR code</div>
-                <div>• Ensure good lighting without glare</div>
-                <div>• Make QR code fill most of the frame</div>
-                <div>• Avoid shadows or reflections</div>
+                <div>• Hold phone steady and get close to QR code</div>
+                <div>• Ensure bright, even lighting</div>
+                <div>• Fill the frame with the QR code</div>
+                <div>• Avoid shadows, glare, or blurry photos</div>
               </div>
             </div>
           </div>
@@ -219,12 +175,12 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             <div className="flex items-center space-x-2 mb-4">
               <Camera className="w-5 h-5 text-gray-600" />
               <span className="font-medium text-gray-800">
-                {extractedUrl ? 'QR Code Processed' : 'EEG Station QR Code'}
+                {extractedUrl ? 'QR Code Detected ✅' : 'EEG Station QR Code'}
               </span>
             </div>
 
             {/* Image/QR Display */}
-            <div className="relative rounded-lg overflow-hidden bg-gray-100" style={{ height: '320px' }}>
+            <div className="relative rounded-lg overflow-hidden bg-gray-100" style={{ height: '300px' }}>
               {capturedImage ? (
                 /* Captured Image */
                 <div className="relative w-full h-full">
@@ -235,9 +191,17 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                   />
                   {isProcessing && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <div className="bg-white rounded-lg p-4 text-center">
-                        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                        <div className="text-sm font-medium">Processing QR Code...</div>
+                      <div className="bg-white rounded-lg p-6 text-center max-w-xs">
+                        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+                        <div className="font-medium mb-2">Scanning QR Code...</div>
+                        <div className="text-sm text-gray-600">Using advanced detection algorithms</div>
+                      </div>
+                    </div>
+                  )}
+                  {extractedUrl && (
+                    <div className="absolute top-2 right-2">
+                      <div className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
+                        ✓ QR Detected
                       </div>
                     </div>
                   )}
@@ -253,9 +217,6 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                 </div>
               )}
             </div>
-
-            {/* Hidden canvas for QR processing */}
-            <canvas ref={canvasRef} className="hidden" />
           </div>
 
           {/* Extracted URL Display */}
@@ -268,7 +229,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
               <div className="flex items-start space-x-3">
                 <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
                 <div className="flex-1">
-                  <div className="font-medium text-green-800 mb-2">QR Code URL Extracted:</div>
+                  <div className="font-medium text-green-800 mb-2">🔗 QR Code URL Extracted:</div>
                   <div className="bg-white border border-green-200 rounded-lg p-3 mb-3">
                     <div className="flex items-start space-x-2">
                       <ExternalLink className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -278,7 +239,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                     </div>
                   </div>
                   <div className="text-sm text-green-700">
-                    This URL will be used to connect to your EEG station.
+                    ✅ This URL will be used to connect to your EEG station.
                   </div>
                 </div>
               </div>
@@ -295,7 +256,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
               <div className="flex items-start space-x-3">
                 <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
                 <div>
-                  <div className="font-medium text-red-800 mb-1">Scan Failed</div>
+                  <div className="font-medium text-red-800 mb-1">❌ Scan Failed</div>
                   <div className="text-sm text-red-700">{error}</div>
                 </div>
               </div>
@@ -339,7 +300,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                     onClick={resetScan}
                     className="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-300 transition-colors"
                   >
-                    Take New Photo
+                    🔄 Take New Photo
                   </button>
                 )}
               </div>
@@ -358,7 +319,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                   onClick={resetScan}
                   className="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-300 transition-colors"
                 >
-                  Scan Different QR Code
+                  📸 Scan Different QR Code
                 </button>
               </div>
             )}
