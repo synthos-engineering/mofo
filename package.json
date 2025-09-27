@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "pnpm --parallel --filter='!contracts' dev",
+    "dev:landing": "pnpm --filter='@mofo/landing-page' dev",
     "build": "pnpm --recursive build",
     "test": "pnpm --recursive test",
     "lint": "pnpm --recursive lint",
