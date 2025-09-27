@@ -16,34 +16,50 @@ export default function HomePage() {
   })
 
   useEffect(() => {
-    const initializeApp = () => {
+    const checkAuthState = () => {
       try {
-        console.log('MiniKit installed:', MiniKit.isInstalled())
-        
         if (MiniKit.isInstalled()) {
-          console.log('Running in World App')
-          
-          // Check if user is already authenticated
+          // Check if user is already signed in
           const walletAddress = (MiniKit as any).walletAddress
           if (walletAddress) {
+            console.log('User already signed in:', walletAddress)
+            
             // Check if user has completed onboarding
             const savedStep = localStorage.getItem('onboarding-step')
-            setAuthState({
-              isAuthenticated: true,
-              walletAddress,
-              user: null,
-              currentStep: (savedStep as OnboardingStep) || 'verification-complete'
-            })
+            
+            if (savedStep === 'dating-hub' || savedStep === 'completed') {
+              // User has completed full onboarding, go directly to hub
+              setAuthState({
+                isAuthenticated: true,
+                walletAddress,
+                user: null,
+                currentStep: 'dating-hub'
+              })
+            } else if (savedStep) {
+              // User is mid-onboarding, resume where they left off
+              setAuthState({
+                isAuthenticated: true,
+                walletAddress,
+                user: null,
+                currentStep: (savedStep as OnboardingStep)
+              })
+            } else {
+              // User is signed in but hasn't started onboarding
+              setAuthState({
+                isAuthenticated: true,
+                walletAddress,
+                user: null,
+                currentStep: 'verification-complete'
+              })
+            }
           }
-        } else {
-          console.log('Running in browser - World App not detected')
         }
       } catch (error) {
-        console.error('Failed to initialize app:', error)
+        console.error('Failed to check auth state:', error)
       }
     }
 
-    initializeApp()
+    checkAuthState()
   }, [])
 
   const handleStepComplete = (nextStep: OnboardingStep, updatedState?: Partial<AuthState>) => {
