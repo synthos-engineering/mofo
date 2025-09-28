@@ -25,7 +25,7 @@ export function EnsClaimScreen({ onComplete, registeredEnsName, agentId, onBack 
   // If ENS name was already registered during agent creation, show confirmation
   const isConfirmed = !!registeredEnsName
 
-  const fullEnsName = `${ensName}${lastName ? `.${lastName}` : ''}.onlyagents.eth`
+  const fullEnsName = `${ensName}${lastName ? `.${lastName}` : ''}.mofo.eth`
 
   useEffect(() => {
     // Get wallet address from MiniKit
@@ -202,7 +202,7 @@ export function EnsClaimScreen({ onComplete, registeredEnsName, agentId, onBack 
                   />
                 </div>
                 
-                <div className="text-sm text-gray-500 mb-4">.onlyagents.eth</div>
+                <div className="text-sm text-gray-500 mb-4">.mofo.eth</div>
                 
                 <div className="bg-gray-100 rounded-lg p-3 text-center">
                   <div className="font-mono text-gray-800 font-semibold">{fullEnsName}</div>

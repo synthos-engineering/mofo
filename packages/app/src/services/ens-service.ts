@@ -22,7 +22,7 @@ export async function checkSubdomainAvailability(subdomain: string): Promise<{
     return {
       available: true,
       cost: '12.50',
-      parentDomain: 'onlyagents.eth'
+      parentDomain: 'mofo.eth'
     }
   } catch (error) {
     console.error('Error checking subdomain availability:', error)

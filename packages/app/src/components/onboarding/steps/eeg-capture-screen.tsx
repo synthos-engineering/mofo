@@ -188,31 +188,31 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
     
     const sessionId = `eeg_${userId || 'demo'}_${Date.now()}`
     setEegSessionId(sessionId)
-    console.log('🧠 Starting hardcoded EEG capture simulation:', sessionId)
+    console.log('🧠 Starting EEG capture simulation:', sessionId)
     
-    // 🚧 HARDCODED SIMULATION: Always use simulation for demo purposes
+    // Always use simulation for demo purposes
     // Show EEG device connected status if booth is connected, but use simulated data
     if (connection.connectionStatus === 'connected' && connection.boothData) {
-      console.log('📱 EEG device connected, using hardcoded simulation')
+      console.log('📱 EEG device connected, using simulation')
     } else {
-      console.log('📱 No EEG device, using hardcoded simulation')
+      console.log('📱 No EEG device, using simulation')
     }
     
     startSimulatedCapture(sessionId)
   }
   
-  // Hardcoded simulation for demo purposes
+  // Simulation for demo purposes
   const startSimulatedCapture = (sessionId: string) => {
-    console.log('🎭 Starting hardcoded EEG simulation')
+    console.log('🎭 Starting EEG simulation')
     
     const interval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval)
           
-          // 🚧 HARDCODED: Generate consistent love score for demo
+          // Generate consistent love score for demo
           const loveScore = 78 // Fixed score for consistent demo experience
-          console.log('💖 Hardcoded EEG capture complete - Love Score:', loveScore)
+          console.log('💖 EEG capture complete - Love Score:', loveScore)
           
           setTimeout(() => {
             onComplete(loveScore, sessionId) // Pass data to next step
@@ -224,7 +224,7 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
     }, 100) // Faster capture for demo (10 seconds instead of 60)
   }
 
-  // 🚧 HARDCODED: Removed real EEG data listener to avoid fetch errors
+  // Removed real EEG data listener to avoid fetch errors
   // Everything is simulated for demo purposes
 
   return (
@@ -442,7 +442,7 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
                 <div className="text-xs text-gray-500 mt-1">Please remain still and relaxed</div>
                 {connection.connectionStatus === 'connected' && (
                   <div className="text-xs text-blue-600 mt-1">
-                    📊 Hardcoded EEG simulation: {Math.floor(progress)}% complete
+                    📊 EEG simulation: {Math.floor(progress)}% complete
                   </div>
                 )}
               </>

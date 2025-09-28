@@ -25,7 +25,7 @@ interface AgentConfigurationScreenProps {
 }
 
 export function AgentConfigurationScreen({ onComplete, userId, eegData, onBack }: AgentConfigurationScreenProps) {
-  // 🚧 HARDCODED: EEG-derived traits for consistent demo (based on wireframes)
+  // EEG-derived traits for consistent demo (based on wireframes)
   const [traits, setTraits] = useState({
     openness: 72,      // "Curious 72%" from wireframe W-09
     conscientiousness: 85, // "Organized 85%" from wireframe W-09  
