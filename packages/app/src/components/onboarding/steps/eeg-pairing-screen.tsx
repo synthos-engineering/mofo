@@ -12,6 +12,9 @@ declare global {
   }
 }
 
+// Configuration (same as mock-scanner-frontend)
+const DEFAULT_RELAYER_URL = 'wss://172.24.244.146:8765'
+
 interface EegPairingScreenProps {
   onComplete: () => void
 }
@@ -27,7 +30,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
   const [error, setError] = useState<string | null>(null)
   const [showManualInput, setShowManualInput] = useState(false)
-  const [manualUrl, setManualUrl] = useState('')
+  const [manualBoothId, setManualBoothId] = useState('')
   const [isScanning, setIsScanning] = useState(false)
   const websocketRef = useRef<WebSocket | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -127,60 +130,50 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
     try {
       setIsScanning(true)
       setError(null)
+      console.log('🎬 Starting QR scanning...')
       
       // Import QR Scanner dynamically (same as mock-scanner-frontend)
       const QrScanner = (await import('qr-scanner')).default
+      console.log('📦 QR Scanner loaded:', QrScanner)
       
       if (videoRef.current) {
+        console.log('📹 Video element found, creating QR scanner...')
         qrScannerRef.current = new QrScanner(
           videoRef.current,
           (result: any) => {
             try {
-              console.log('🔍 QR Code scanned:', result.data)
+              console.log('QR Code scanned:', result.data)  // Exact log format from mock-scanner
               
-              // Try to parse as JSON first (booth data)
-              try {
-                const qrData = JSON.parse(result.data) as EegBoothData
-                console.log('📄 Booth data parsed:', qrData)
-                
-                if (qrData.booth_id && qrData.relayer_url) {
-                  setExtractedUrl(result.data)
-                  setBoothData(qrData)
-                  qrScannerRef.current?.stop()
-                  setIsScanning(false)
-                  
-                  // Connect to booth
-                  connectToBoothRelay(qrData)
-                } else {
-                  setError('Invalid QR code format. Expected booth connection data.')
-                }
-              } catch (jsonError) {
-                console.log('Not JSON, treating as plain URL:', result.data)
-                
-                // Treat as plain URL
-                const urlData: EegBoothData = {
-                  booth_id: `booth_${Date.now()}`,
-                  relayer_url: result.data
-                }
-                
+              // Parse QR data (exact logic from mock-scanner-frontend)
+              const qrData = JSON.parse(result.data)
+              
+              if (qrData.booth_id && qrData.relayer_url) {
+                console.log('Valid booth data found:', qrData)
                 setExtractedUrl(result.data)
-                setBoothData(urlData)
+                setBoothData(qrData)
                 qrScannerRef.current?.stop()
                 setIsScanning(false)
                 
-                // Connect to booth
-                connectToBoothRelay(urlData)
-              }
-              
-              if (MiniKit.isInstalled()) {
-                MiniKit.commands.sendHapticFeedback({
-                  hapticsType: 'notification',
-                  style: 'success',
-                })
+                // Connect to booth (same as mock-scanner-frontend)
+                connectToBoothRelay(qrData)
+                
+                if (MiniKit.isInstalled()) {
+                  MiniKit.commands.sendHapticFeedback({
+                    hapticsType: 'notification',
+                    style: 'success',
+                  })
+                }
+              } else {
+                console.error('Invalid QR code format. Expected booth connection data.')
+                setError('Invalid QR code format. Expected booth connection data.')
+                qrScannerRef.current?.stop()
+                setIsScanning(false)
               }
             } catch (error) {
-              console.error('QR processing error:', error)
-              setError('Failed to process QR code. Please try again.')
+              console.error('Invalid QR code. Please scan a valid booth QR code.')
+              setError('Invalid QR code. Please scan a valid booth QR code.')
+              qrScannerRef.current?.stop()
+              setIsScanning(false)
             }
           },
           {
@@ -190,10 +183,15 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
         )
         
         await qrScannerRef.current.start()
-        console.log('📷 QR Scanner started')
+        console.log('✅ QR Scanner started successfully')
+        console.log('📹 Video should now be visible')
+      } else {
+        console.error('❌ Video element not found')
+        setError('Video element not available')
+        setIsScanning(false)
       }
     } catch (error) {
-      console.error('Error starting QR scanner:', error)
+      console.error('❌ Error starting QR scanner:', error)
       setIsScanning(false)
       setError('Camera access required for QR scanning. Please allow camera permissions.')
       
@@ -215,18 +213,19 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   }
 
   const handleManualSubmit = () => {
-    if (manualUrl.trim()) {
-      console.log('📝 Manual URL entered:', manualUrl)
-      setExtractedUrl(manualUrl.trim())
+    if (manualBoothId.trim()) {
+      console.log('📝 Manual booth ID entered:', manualBoothId)
       
-      // Create booth data from manual URL
+      // Create booth data from manual booth ID (same as mock-scanner-frontend)
       const data: EegBoothData = {
-        booth_id: `manual_booth_${Date.now()}`,
-        relayer_url: manualUrl.trim()
+        booth_id: manualBoothId.trim(),
+        relayer_url: DEFAULT_RELAYER_URL
       }
       
+      setExtractedUrl(JSON.stringify(data))
       setBoothData(data)
       setShowManualInput(false)
+      setManualBoothId('')
       
       // Connect to booth
       connectToBoothRelay(data)
@@ -254,7 +253,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
     setExtractedUrl(null)
     setError(null)
     setShowManualInput(false)
-    setManualUrl('')
+    setManualBoothId('')
     setBoothData(null)
     setConnectionStatus('disconnected')
     
@@ -391,12 +390,13 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
               <div className="relative rounded-lg overflow-hidden bg-black" style={{ height: '300px' }}>
                 <video 
                   ref={videoRef} 
-                  className="w-full h-full object-cover"
-                  style={{ transform: 'scaleX(-1)' }}
+                  style={{
+                    width: '100%',
+                    height: '300px',
+                    objectFit: 'cover',
+                    backgroundColor: '#000'
+                  }}
                 />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-48 h-48 border-4 border-blue-500 rounded-lg bg-blue-500/20 animate-pulse"></div>
-                </div>
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
                   <div className="bg-black/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
                     📷 Point camera at QR code
@@ -415,22 +415,27 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             >
               <div className="flex items-center space-x-2 mb-4">
                 <Type className="w-5 h-5 text-gray-600" />
-                <span className="font-medium text-gray-800">Enter EEG Station URL</span>
+                <span className="font-medium text-gray-800">Enter Booth ID</span>
               </div>
               
               <div className="space-y-3">
                 <input
-                  type="url"
-                  value={manualUrl}
-                  onChange={(e) => setManualUrl(e.target.value)}
-                  placeholder="wss://192.168.1.100:8765 or ws://eeg-station.local"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-mono"
+                  type="text"
+                  value={manualBoothId}
+                  onChange={(e) => setManualBoothId(e.target.value)}
+                  placeholder="booth_123"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  onKeyPress={(e) => e.key === 'Enter' && handleManualSubmit()}
                 />
+                
+                <div className="text-xs text-gray-500">
+                  Will connect to: {DEFAULT_RELAYER_URL}
+                </div>
                 
                 <div className="flex space-x-2">
                   <button
                     onClick={handleManualSubmit}
-                    disabled={!manualUrl.trim()}
+                    disabled={!manualBoothId.trim()}
                     className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Connect
@@ -438,7 +443,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                   <button
                     onClick={() => {
                       setShowManualInput(false)
-                      setManualUrl('')
+                      setManualBoothId('')
                     }}
                     className="bg-gray-200 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-300"
                   >
@@ -483,7 +488,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                   className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-medium shadow-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
                 >
                   <Type className="w-4 h-4" />
-                  <span>⌨️ Enter URL Manually</span>
+                  <span>⌨️ Enter Booth ID Manually</span>
                 </button>
               </div>
             )}
