@@ -1,15 +1,20 @@
 export interface User {
-  id: string
-  name: string
-  age: number
-  bio: string
-  images: string[]
+  id?: string
+  name?: string
+  age?: number
+  bio?: string
+  images?: string[]
   walletAddress?: string
-  isVerified: boolean
-  interests: string[]
-  location: string
+  isVerified?: boolean
+  interests?: string[]
+  location?: string
   ensName?: string
   personalityTraits?: PersonalityTraits
+  eegData?: {
+    loveScore: number
+    sessionId: string
+  }
+  agentId?: string
 }
 
 export interface PersonalityTraits {

@@ -68,10 +68,17 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
       case 'eeg-capture':
         return (
           <EegCaptureScreen 
-            userId={authState.walletAddress || undefined}
+            userId={authState.user?.id || authState.walletAddress || undefined}
             onComplete={(loveScore, sessionId) => {
-              setEegData({ loveScore, sessionId })
-              onStepComplete('agent-configuration')
+              // Store EEG data in user object (following app-reference pattern)
+              onStepComplete('agent-configuration', {
+                user: {
+                  ...authState.user,
+                  id: authState.user?.id || authState.walletAddress || `user_${Date.now()}`,
+                  walletAddress: authState.walletAddress || undefined,
+                  eegData: { loveScore, sessionId }
+                }
+              })
             }} 
           />
         )
@@ -79,11 +86,17 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
       case 'agent-configuration':
         return (
           <AgentConfigurationScreen 
-            userId={authState.walletAddress || undefined}
-            eegData={eegData || undefined}
+            userId={authState.user?.id || authState.walletAddress || undefined}
+            eegData={authState.user?.eegData}
             onComplete={(agentCreationData) => {
-              setAgentData(agentCreationData)
-              onStepComplete('ens-claim')
+              // Store agent data in user object (following app-reference pattern)
+              onStepComplete('ens-claim', {
+                user: {
+                  ...authState.user,
+                  agentId: agentCreationData.agentId,
+                  personalityTraits: agentCreationData.personalityTraits
+                }
+              })
             }} 
           />
         )

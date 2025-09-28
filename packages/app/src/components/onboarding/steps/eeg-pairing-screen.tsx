@@ -4,7 +4,13 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink, Type, Wifi, WifiOff } from 'lucide-react'
 import { MiniKit } from '@worldcoin/minikit-js'
-import { Html5Qrcode } from 'html5-qrcode'
+
+// QR Scanner types (following mock-scanner-frontend pattern)
+declare global {
+  interface Window {
+    QrScanner: any;
+  }
+}
 
 interface EegPairingScreenProps {
   onComplete: () => void
@@ -16,18 +22,18 @@ interface EegBoothData {
 }
 
 export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
-  const [isProcessing, setIsProcessing] = useState(false)
   const [extractedUrl, setExtractedUrl] = useState<string | null>(null)
   const [boothData, setBoothData] = useState<EegBoothData | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
   const [error, setError] = useState<string | null>(null)
-  const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [showManualInput, setShowManualInput] = useState(false)
   const [manualUrl, setManualUrl] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isScanning, setIsScanning] = useState(false)
   const websocketRef = useRef<WebSocket | null>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const qrScannerRef = useRef<any>(null)
 
-  // WebSocket connection to EEG booth (based on mock-scanner-frontend)
+  // WebSocket connection to EEG booth (exact copy from mock-scanner-frontend)
   const connectToBoothRelay = useCallback(async (data: EegBoothData) => {
     if (websocketRef.current?.readyState === WebSocket.OPEN) {
       websocketRef.current.close()
@@ -45,7 +51,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
       ws.onopen = () => {
         console.log('✅ Connected to EEG booth relayer')
         
-        // Send scanner connection request
+        // Send scanner connection request (exact from mock-scanner-frontend)
         const connectMessage = {
           type: 'connect_scanner',
           booth_id: data.booth_id
@@ -64,7 +70,6 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             setConnectionStatus('connected')
             console.log('🎉 Successfully connected to EEG booth!')
             
-            // Send haptic feedback for success
             if (MiniKit.isInstalled()) {
               MiniKit.commands.sendHapticFeedback({
                 hapticsType: 'notification',
@@ -117,78 +122,95 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
     }
   }, [connectionStatus, onComplete])
 
-  const processImage = async (file: File) => {
-    setIsProcessing(true)
-    setError(null)
-
+  // QR Scanner implementation (exact copy from mock-scanner-frontend)
+  const startQRScanning = async () => {
     try {
-      console.log('🖼️ Processing image:', file.name, file.size, 'bytes', file.type)
+      setIsScanning(true)
+      setError(null)
       
-      // Create image preview
-      const imageUrl = URL.createObjectURL(file)
-      setCapturedImage(imageUrl)
-
-      // Use Html5Qrcode for better detection
-      console.log('🔍 Starting QR detection with Html5Qrcode...')
+      // Import QR Scanner dynamically (same as mock-scanner-frontend)
+      const QrScanner = (await import('qr-scanner')).default
       
-      const html5QrCode = new Html5Qrcode("dummy-id")
-      
-      try {
-        const result = await html5QrCode.scanFile(file, true)
-        
-        console.log('✅ QR Code detected:', result)
-        setExtractedUrl(result)
-        
-        // Try to parse as booth JSON data
-        try {
-          const parsed = JSON.parse(result) as EegBoothData
-          if (parsed.booth_id && parsed.relayer_url) {
-            setBoothData(parsed)
-            console.log('🏢 Booth data parsed:', parsed)
-            
-            // Auto-connect to booth
-            connectToBoothRelay(parsed)
-          } else {
-            // Treat as plain URL
-            setBoothData({
-              booth_id: `booth_${Date.now()}`,
-              relayer_url: result
-            })
+      if (videoRef.current) {
+        qrScannerRef.current = new QrScanner(
+          videoRef.current,
+          (result: any) => {
+            try {
+              console.log('🔍 QR Code scanned:', result.data)
+              
+              // Try to parse as JSON first (booth data)
+              try {
+                const qrData = JSON.parse(result.data) as EegBoothData
+                console.log('📄 Booth data parsed:', qrData)
+                
+                if (qrData.booth_id && qrData.relayer_url) {
+                  setExtractedUrl(result.data)
+                  setBoothData(qrData)
+                  qrScannerRef.current?.stop()
+                  setIsScanning(false)
+                  
+                  // Connect to booth
+                  connectToBoothRelay(qrData)
+                } else {
+                  setError('Invalid QR code format. Expected booth connection data.')
+                }
+              } catch (jsonError) {
+                console.log('Not JSON, treating as plain URL:', result.data)
+                
+                // Treat as plain URL
+                const urlData: EegBoothData = {
+                  booth_id: `booth_${Date.now()}`,
+                  relayer_url: result.data
+                }
+                
+                setExtractedUrl(result.data)
+                setBoothData(urlData)
+                qrScannerRef.current?.stop()
+                setIsScanning(false)
+                
+                // Connect to booth
+                connectToBoothRelay(urlData)
+              }
+              
+              if (MiniKit.isInstalled()) {
+                MiniKit.commands.sendHapticFeedback({
+                  hapticsType: 'notification',
+                  style: 'success',
+                })
+              }
+            } catch (error) {
+              console.error('QR processing error:', error)
+              setError('Failed to process QR code. Please try again.')
+            }
+          },
+          {
+            highlightScanRegion: true,
+            highlightCodeOutline: true,
           }
-        } catch (jsonError) {
-          // Not JSON, treat as URL
-          setBoothData({
-            booth_id: `booth_${Date.now()}`,
-            relayer_url: result
-          })
-        }
+        )
         
-        if (MiniKit.isInstalled()) {
-          MiniKit.commands.sendHapticFeedback({
-            hapticsType: 'notification',
-            style: 'success',
-          })
-        }
-        
-      } catch (qrError) {
-        console.error('❌ QR detection failed:', qrError)
-        setError('No QR code found in this image. Please try taking a clearer photo or enter the URL manually.')
-        
-        if (MiniKit.isInstalled()) {
-          MiniKit.commands.sendHapticFeedback({
-            hapticsType: 'notification',
-            style: 'error',
-          })
-        }
+        await qrScannerRef.current.start()
+        console.log('📷 QR Scanner started')
       }
+    } catch (error) {
+      console.error('Error starting QR scanner:', error)
+      setIsScanning(false)
+      setError('Camera access required for QR scanning. Please allow camera permissions.')
       
-      setIsProcessing(false)
-      URL.revokeObjectURL(imageUrl)
+      if (MiniKit.isInstalled()) {
+        MiniKit.commands.sendHapticFeedback({
+          hapticsType: 'notification',
+          style: 'error',
+        })
+      }
+    }
+  }
 
-    } catch (err) {
-      console.error('🚨 Image processing failed:', err)
-      setError('Failed to process the image. Please try again or enter URL manually.')
-      setIsProcessing(false)
+  const stopQRScanning = () => {
+    if (qrScannerRef.current) {
+      qrScannerRef.current.stop()
+      setIsScanning(false)
+      console.log('🛑 QR Scanner stopped')
     }
   }
 
@@ -218,14 +240,6 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      console.log('📷 Image captured:', file.name, file.size, 'bytes')
-      processImage(file)
-    }
-  }
-
   const handleContinue = () => {
     if (MiniKit.isInstalled()) {
       MiniKit.commands.sendHapticFeedback({
@@ -239,25 +253,27 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const resetScan = () => {
     setExtractedUrl(null)
     setError(null)
-    setCapturedImage(null)
     setShowManualInput(false)
     setManualUrl('')
     setBoothData(null)
     setConnectionStatus('disconnected')
     
-    // Close any open WebSocket connections
+    // Stop QR scanner and close WebSocket
+    if (qrScannerRef.current) {
+      qrScannerRef.current.stop()
+    }
     if (websocketRef.current) {
       websocketRef.current.close()
     }
-    
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
+    setIsScanning(false)
   }
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (qrScannerRef.current) {
+        qrScannerRef.current.destroy()
+      }
       if (websocketRef.current) {
         websocketRef.current.close()
       }
@@ -299,7 +315,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
           <Brain className="w-12 h-12 text-gray-800 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Connect Your EEG Device</h1>
           <p className="text-gray-600 text-sm max-w-sm mx-auto">
-            Take a clear photo of the QR code on your EEG station to establish a secure connection
+            Scan the QR code on your EEG station to establish a secure connection
           </p>
         </div>
 
@@ -329,24 +345,12 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                 <div className="text-sm text-gray-600">
                   Booth ID: {boothData.booth_id}
                 </div>
+                <div className="text-xs text-gray-500 font-mono break-all">
+                  {boothData.relayer_url}
+                </div>
               </div>
             </div>
           </motion.div>
-        )}
-
-        {/* Photo Tips */}
-        {!extractedUrl && (
-          <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 mb-6">
-            <div className="text-sm text-yellow-800">
-              <div className="font-medium mb-2">📸 Photo Tips for Best Results:</div>
-              <div className="space-y-1 text-yellow-700">
-                <div>• Hold phone steady and get close to QR code</div>
-                <div>• Ensure bright, even lighting</div>
-                <div>• Fill the frame with the QR code</div>
-                <div>• Avoid shadows, glare, or blurry photos</div>
-              </div>
-            </div>
-          </div>
         )}
 
         {/* Privacy Notice */}
@@ -362,77 +366,40 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
           </div>
         </div>
 
-        {/* Photo/QR Display Section */}
+        {/* Camera/QR Display Section */}
         <div className="flex-1 flex flex-col">
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 mb-6">
-            <div className="flex items-center space-x-2 mb-4">
-              <Camera className="w-5 h-5 text-gray-600" />
-              <span className="font-medium text-gray-800">
-                {extractedUrl ? 'QR Code Detected ✅' : 'EEG Station QR Code'}
-              </span>
-            </div>
-
-            {/* Image/QR Display */}
-            <div className="relative rounded-lg overflow-hidden bg-gray-100" style={{ height: '300px' }}>
-              {capturedImage ? (
-                /* Captured Image */
-                <div className="relative w-full h-full">
-                  <img
-                    src={capturedImage}
-                    alt="Captured QR Code"
-                    className="w-full h-full object-contain bg-gray-900"
-                  />
-                  {isProcessing && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <div className="bg-white rounded-lg p-6 text-center max-w-xs">
-                        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                        <div className="font-medium mb-2">Scanning QR Code...</div>
-                        <div className="text-sm text-gray-600">Using advanced detection algorithms</div>
-                      </div>
-                    </div>
-                  )}
-                  {extractedUrl && (
-                    <div className="absolute top-2 right-2">
-                      <div className="bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
-                        ✓ QR Detected
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Placeholder */
-                <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 bg-gray-50">
-                  <Camera className="w-16 h-16 text-gray-400 mb-4" />
-                  <div className="text-sm text-gray-500 text-center">
-                    <div className="font-medium mb-1">Ready to capture QR code</div>
-                    <div>Tap button below to take photo</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Extracted URL Display */}
-          {extractedUrl && (
+          {/* Camera View for QR Scanning */}
+          {isScanning && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-green-50 border border-green-100 rounded-xl p-4 mb-6"
+              className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 mb-6"
             >
-              <div className="flex items-start space-x-3">
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                <div className="flex-1">
-                  <div className="font-medium text-green-800 mb-2">🔗 EEG Booth URL Extracted:</div>
-                  <div className="bg-white border border-green-200 rounded-lg p-3 mb-3">
-                    <div className="flex items-start space-x-2">
-                      <ExternalLink className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <div className="text-sm font-mono text-blue-800 break-all">
-                        {extractedUrl}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-sm text-green-700">
-                    ✅ Establishing WebSocket connection to EEG station...
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <Camera className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium text-gray-800">Scanning for QR Code</span>
+                </div>
+                <button
+                  onClick={stopQRScanning}
+                  className="text-red-600 hover:text-red-800 font-medium text-sm"
+                >
+                  Stop
+                </button>
+              </div>
+              
+              <div className="relative rounded-lg overflow-hidden bg-black" style={{ height: '300px' }}>
+                <video 
+                  ref={videoRef} 
+                  className="w-full h-full object-cover"
+                  style={{ transform: 'scaleX(-1)' }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-48 h-48 border-4 border-blue-500 rounded-lg bg-blue-500/20 animate-pulse"></div>
+                </div>
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+                  <div className="bg-black/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                    📷 Point camera at QR code
                   </div>
                 </div>
               </div>
@@ -501,27 +468,16 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
 
           {/* Action Buttons */}
           <div className="space-y-4">
-            {!extractedUrl && !showManualInput && (
+            {connectionStatus === 'disconnected' && !isScanning && !showManualInput && (
               <div className="space-y-3">
                 <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isProcessing}
-                  className="w-full bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center space-x-2 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={startQRScanning}
+                  className="w-full bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center space-x-2 hover:bg-gray-800 transition-colors"
                 >
-                  {isProcessing ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Scanning QR Code...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-5 h-5" />
-                      <span>📸 Take Photo of QR Code</span>
-                    </>
-                  )}
+                  <Camera className="w-5 h-5" />
+                  <span>📷 Scan QR Code with Camera</span>
                 </button>
 
-                {/* Manual Input Option */}
                 <button
                   onClick={() => setShowManualInput(true)}
                   className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl font-medium shadow-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors"
@@ -529,16 +485,6 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                   <Type className="w-4 h-4" />
                   <span>⌨️ Enter URL Manually</span>
                 </button>
-
-                {/* Hidden file input */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
               </div>
             )}
 
@@ -553,7 +499,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             )}
 
             {/* Retry/Reset Options */}
-            {(error || capturedImage || extractedUrl) && connectionStatus !== 'connected' && (
+            {(error || extractedUrl) && connectionStatus !== 'connected' && !isScanning && !showManualInput && (
               <button
                 onClick={resetScan}
                 className="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-300 transition-colors"

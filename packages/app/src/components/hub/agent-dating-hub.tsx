@@ -16,9 +16,21 @@ interface AgentDatingHubProps {
 type HubScreen = 'main' | 'date-summary' | 'propose-date' | 'coordination' | 'agreed' | 'stake' | 'review'
 
 export function AgentDatingHub({ authState }: AgentDatingHubProps) {
+  // ============================================================
+  // 🔥 ENHANCED FOR ASI BACKEND: Real agent state management
+  // ============================================================
   const [agentStatus, setAgentStatus] = useState<'offline' | 'dating'>('dating')
   const [currentScreen, setCurrentScreen] = useState<HubScreen>('main')
   const [selectedMatch, setSelectedMatch] = useState<any>(null)
+
+  // TODO: INTEGRATION TEAM - Add real backend data loading
+  // useEffect(() => {
+  //   const loadAgentData = async () => {
+  //     const agentProfile = await asiBackend.getAgentProfile(authState.user?.id)
+  //     setAgentStatus(agentProfile.agent.isActive ? 'dating' : 'offline')
+  //   }
+  //   loadAgentData()
+  // }, [authState.user?.id])
 
   // Render different screens based on currentScreen
   if (currentScreen === 'date-summary') {
@@ -91,7 +103,8 @@ export function AgentDatingHub({ authState }: AgentDatingHubProps) {
               </div>
               <div>
                 <div className="font-medium text-gray-900">Your Agent</div>
-                <div className="text-sm text-gray-500">viman.mofo.eth</div>
+                {/* TODO: INTEGRATION TEAM - Replace with real agent ENS name */}
+                <div className="text-sm text-gray-500">{authState.user?.ensName || 'viman.mofo.eth'}</div>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -151,6 +164,7 @@ export function AgentDatingHub({ authState }: AgentDatingHubProps) {
           
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div className="text-center">
+              {/* TODO: INTEGRATION TEAM - Replace with real data from asiBackend.getAgentStats() */}
               <div className="text-2xl font-bold text-gray-900">12</div>
               <div className="text-sm text-gray-600">Agent Dates</div>
             </div>
@@ -274,6 +288,7 @@ export function AgentDatingHub({ authState }: AgentDatingHubProps) {
               <div className="w-12 h-12 bg-pink-500 rounded-full flex items-center justify-center mb-2">
                 <Bot className="w-6 h-6 text-white" />
               </div>
+              {/* TODO: INTEGRATION TEAM - Replace with real matched agent from asiBackend */}
               <div className="text-sm font-medium">Elena's Agent</div>
               <div className="text-xs text-gray-600">elena.mofo.eth</div>
             </div>
@@ -298,6 +313,14 @@ export function AgentDatingHub({ authState }: AgentDatingHubProps) {
           transition={{ delay: 0.7 }}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
+          onClick={async () => {
+            // TODO: INTEGRATION TEAM - Replace with real ASI backend matching
+            // Call: asiBackend.requestNewMatches(authState.user?.id)
+            // Expected: Navigate to agent-chat page with new match
+            // BACKEND: system_agent.py findCompatibleAgents()
+            console.log('Starting agent dating with real ASI backend...')
+            console.log('User agent data:', authState.user?.agentId, authState.user?.personalityTraits)
+          }}
           className="w-full bg-black text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center space-x-2"
         >
           <Users className="w-5 h-5" />
