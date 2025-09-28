@@ -26,6 +26,7 @@ interface EegBoothData {
 
 export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const [extractedUrl, setExtractedUrl] = useState<string | null>(null)
+  const [rawQrText, setRawQrText] = useState<string | null>(null) // For debugging
   const [boothData, setBoothData] = useState<EegBoothData | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
   const [error, setError] = useState<string | null>(null)
@@ -157,18 +158,21 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
         qrScannerRef.current = new QrScanner(
           videoRef.current,
           (result: any) => {
+            console.log('🔍 QR Code scanned - Raw data:', result.data)
+            setRawQrText(result.data) // Store for debugging
+            
             try {
-              console.log('QR Code scanned:', result.data)  // Exact log format from mock-scanner
-              
               // Parse QR data (exact logic from mock-scanner-frontend)
               const qrData = JSON.parse(result.data)
+              console.log('📄 Parsed JSON data:', qrData)
               
               if (qrData.booth_id && qrData.relayer_url) {
-                console.log('Valid booth data found:', qrData)
+                console.log('✅ Valid booth data found:', qrData)
                 setExtractedUrl(result.data)
                 setBoothData(qrData)
                 qrScannerRef.current?.stop()
                 setIsScanning(false)
+                setError(null) // Clear any previous errors
                 
                 // Connect to booth (same as mock-scanner-frontend)
                 connectToBoothRelay(qrData)
@@ -180,14 +184,15 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                   })
                 }
               } else {
-                console.error('Invalid QR code format. Expected booth connection data.')
-                setError('Invalid QR code format. Expected booth connection data.')
+                console.error('❌ Missing required fields in QR data:', qrData)
+                setError(`Invalid QR format. Missing booth_id or relayer_url. Found: ${JSON.stringify(qrData)}`)
                 qrScannerRef.current?.stop()
                 setIsScanning(false)
               }
-            } catch (error) {
-              console.error('Invalid QR code. Please scan a valid booth QR code.')
-              setError('Invalid QR code. Please scan a valid booth QR code.')
+            } catch (parseError) {
+              console.error('❌ JSON parse failed:', parseError)
+              console.error('❌ Raw QR text was:', result.data)
+              setError(`QR code is not valid JSON. Raw text: "${result.data}"`)
               qrScannerRef.current?.stop()
               setIsScanning(false)
             }
@@ -285,6 +290,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
 
   const resetScan = () => {
     setExtractedUrl(null)
+    setRawQrText(null) // Clear debug data
     setError(null)
     setShowManualInput(false)
     setManualBoothId('')
@@ -508,9 +514,22 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             >
               <div className="flex items-start space-x-3">
                 <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-                <div>
+                <div className="flex-1">
                   <div className="font-medium text-red-800 mb-1">❌ Connection Failed</div>
-                  <div className="text-sm text-red-700">{error}</div>
+                  <div className="text-sm text-red-700 mb-3">{error}</div>
+                  
+                  {/* Debug info showing raw QR text */}
+                  {rawQrText && (
+                    <div className="bg-white border border-red-200 rounded-lg p-3 mt-2">
+                      <div className="text-xs text-red-800 mb-1 font-medium">🔍 Debug - Raw QR Text:</div>
+                      <div className="text-xs font-mono text-red-700 break-all bg-red-50 p-2 rounded">
+                        {rawQrText}
+                      </div>
+                      <div className="text-xs text-red-600 mt-2">
+                        Expected format: {`{"booth_id": "booth_123", "relayer_url": "wss://..."}`}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -535,12 +554,38 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                     input.type = 'file'
                     input.accept = 'image/*'
                     input.capture = 'environment'
-                    input.onchange = (e) => {
+                    input.onchange = async (e) => {
                       const file = (e.target as HTMLInputElement).files?.[0]
                       if (file) {
                         console.log('📸 Photo captured via direct input:', file.name)
-                        // For now just show success (you can add QR processing here)
-                        setError('Photo captured! QR processing would happen here.')
+                        
+                        try {
+                          // Process the captured image for QR code
+                          const QrScanner = (await import('qr-scanner')).default
+                          const qrResult = await QrScanner.scanImage(file)
+                          
+                          console.log('🔍 QR extracted from photo:', qrResult)
+                          setRawQrText(qrResult)
+                          
+                          // Try to parse as booth JSON
+                          try {
+                            const qrData = JSON.parse(qrResult)
+                            if (qrData.booth_id && qrData.relayer_url) {
+                              setExtractedUrl(qrResult)
+                              setBoothData(qrData)
+                              setError(null)
+                              connectToBoothRelay(qrData)
+                            } else {
+                              setError(`Invalid booth format. Found: ${JSON.stringify(qrData)}`)
+                            }
+                          } catch (parseError) {
+                            setError(`QR is not valid JSON. Raw text: "${qrResult}"`)
+                          }
+                          
+                        } catch (qrError) {
+                          console.error('❌ QR detection failed in photo:', qrError)
+                          setError('No QR code found in photo. Please take a clearer picture.')
+                        }
                         
                         if (MiniKit.isInstalled()) {
                           MiniKit.commands.sendHapticFeedback({
