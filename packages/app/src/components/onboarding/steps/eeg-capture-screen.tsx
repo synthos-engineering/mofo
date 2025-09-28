@@ -98,13 +98,13 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
         const verifyResponseJson = await verifyResponse.json()
         console.log('📥 Backend verification response:', verifyResponseJson)
         
-        if (verifyResponseJson.status === 200 && verifyResponseJson.verifyRes?.success) {
+        if (verifyResponse.ok && verifyResponseJson.verifyRes?.success) {
           console.log('🎉 WorldCoin verification complete!')
           setIsVerified(true)
           return true
         } else {
-          console.warn('⚠️ Backend verification failed, allowing skip option')
-          setVerificationError('Backend verification failed. You can skip for development.')
+          console.warn('⚠️ Backend verification failed:', verifyResponseJson)
+          setVerificationError(`Backend verification failed: ${verifyResponseJson.message || 'Unknown error'}. You can skip for development.`)
           setShowSkipOption(true)
           return false
         }
