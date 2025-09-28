@@ -38,7 +38,7 @@ export const config = {
 
   // ASI LLM Configuration
   asillm: {
-    endpoint: process.env.ASILLM_ENDPOINT || 'https://api.fetch.ai/llm',
+    endpoint: process.env.ASILLM_ENDPOINT || 'https://api.asi1.ai/v1/chat/completions',
     model: process.env.ASILLM_MODEL || 'asi1-mini',
     apiKey: process.env.ASILLM_API_KEY || '',
   },

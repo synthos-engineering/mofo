@@ -103,8 +103,8 @@ export function AgentDatingHub({ authState }: AgentDatingHubProps) {
               </div>
               <div>
                 <div className="font-medium text-gray-900">Your Agent</div>
-                {/* TODO: INTEGRATION TEAM - Replace with real agent ENS name */}
-                <div className="text-sm text-gray-500">{authState.user?.ensName || 'viman.mofo.eth'}</div>
+                {/* TODO: INTEGRATION TEAM - Replace with real agent name */}
+                <div className="text-sm text-gray-500">{authState.user?.agentId || 'AI Agent'}</div>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -245,7 +245,7 @@ export function AgentDatingHub({ authState }: AgentDatingHubProps) {
                 <span className="text-xs text-green-600">Dating</span>
               </div>
             </div>
-            <div className="text-sm text-green-700 mb-4">viman.mofo.eth</div>
+            <div className="text-sm text-green-700 mb-4">Your AI Agent</div>
             
             <div className="bg-gray-600 rounded-lg h-2 mb-2">
               <div className="bg-green-500 h-2 rounded-lg" style={{ width: '60%' }}></div>
@@ -273,7 +273,7 @@ export function AgentDatingHub({ authState }: AgentDatingHubProps) {
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <div className="text-sm font-medium">Your Agent</div>
-              <div className="text-xs text-gray-600">viman.mofo.eth</div>
+              <div className="text-xs text-gray-600">{authState.user?.agentId || 'AI Agent'}</div>
             </div>
 
             {/* Connection Animation */}
@@ -290,7 +290,7 @@ export function AgentDatingHub({ authState }: AgentDatingHubProps) {
               </div>
               {/* TODO: INTEGRATION TEAM - Replace with real matched agent from asiBackend */}
               <div className="text-sm font-medium">Elena's Agent</div>
-              <div className="text-xs text-gray-600">elena.mofo.eth</div>
+              <div className="text-xs text-gray-600">elena_agent_demo</div>
             </div>
           </div>
 

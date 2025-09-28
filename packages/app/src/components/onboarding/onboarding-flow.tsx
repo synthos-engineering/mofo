@@ -6,9 +6,10 @@ import { VerificationCompleteScreen } from './steps/verification-complete-screen
 import { EegPairingScreen } from './steps/eeg-pairing-screen'
 import { EegCaptureScreen } from './steps/eeg-capture-screen'
 import { AgentConfigurationScreen } from './steps/agent-configuration-screen'
-import { EnsClaimScreen } from './steps/ens-claim-screen'
+
 import { AgentReadyScreen } from './steps/agent-ready-screen'
 import { useState } from 'react'
+import { EegConnectionProvider } from '@/contexts/EEGConnectionContext'
 
 interface OnboardingFlowProps {
   authState: AuthState
@@ -37,6 +38,31 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
   // State to pass data between onboarding steps
   const [eegData, setEegData] = useState<EegData | null>(null)
   const [agentData, setAgentData] = useState<AgentData | null>(null)
+  
+  // Helper function to get previous step
+  const getPreviousStep = (currentStep: OnboardingStep): OnboardingStep | null => {
+    const stepOrder: OnboardingStep[] = [
+      'splash',
+      'verification-complete', 
+      'eeg-pairing',
+      'eeg-capture',
+      'agent-configuration',
+      'agent-ready',
+      'dating-hub'
+    ]
+    
+    const currentIndex = stepOrder.indexOf(currentStep)
+    return currentIndex > 0 ? stepOrder[currentIndex - 1] : null
+  }
+  
+  // Back navigation handler
+  const handleBackNavigation = () => {
+    const previousStep = getPreviousStep(authState.currentStep)
+    if (previousStep) {
+      onStepComplete(previousStep)
+    }
+  }
+  
   const renderStep = () => {
     switch (authState.currentStep) {
       case 'splash':
@@ -54,14 +80,16 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
       case 'verification-complete':
         return (
           <VerificationCompleteScreen 
-            onComplete={() => onStepComplete('eeg-pairing')} 
+            onComplete={() => onStepComplete('eeg-pairing')}
+            onBack={handleBackNavigation}
           />
         )
       
       case 'eeg-pairing':
         return (
           <EegPairingScreen 
-            onComplete={() => onStepComplete('eeg-capture')} 
+            onComplete={() => onStepComplete('eeg-capture')}
+            onBack={handleBackNavigation}
           />
         )
       
@@ -79,7 +107,8 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
                   eegData: { loveScore, sessionId }
                 }
               })
-            }} 
+            }}
+            onBack={handleBackNavigation}
           />
         )
       
@@ -89,29 +118,24 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
             userId={authState.user?.id || authState.walletAddress || undefined}
             eegData={authState.user?.eegData}
             onComplete={(agentCreationData) => {
-              // Store agent data in user object (following app-reference pattern)
-              onStepComplete('ens-claim', {
+              // Store agent data in user object and skip ENS - go directly to agent ready
+              onStepComplete('agent-ready', {
                 user: {
                   ...authState.user,
                   agentId: agentCreationData.agentId,
                   personalityTraits: agentCreationData.personalityTraits
                 }
               })
-            }} 
-          />
-        )
-      
-      case 'ens-claim':
-        return (
-          <EnsClaimScreen 
-            onComplete={() => onStepComplete('agent-ready')} 
+            }}
+            onBack={handleBackNavigation}
           />
         )
       
       case 'agent-ready':
         return (
           <AgentReadyScreen 
-            onComplete={() => onStepComplete('dating-hub')} 
+            onComplete={() => onStepComplete('dating-hub')}
+            onBack={handleBackNavigation}
           />
         )
       
@@ -130,8 +154,10 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {renderStep()}
-    </div>
+    <EegConnectionProvider>
+      <div className="min-h-screen bg-gray-50">
+        {renderStep()}
+      </div>
+    </EegConnectionProvider>
   )
 }

@@ -8,7 +8,6 @@ export interface User {
   isVerified?: boolean
   interests?: string[]
   location?: string
-  ensName?: string
   personalityTraits?: PersonalityTraits
   eegData?: {
     loveScore: number
@@ -60,7 +59,6 @@ export type OnboardingStep =
   | 'eeg-pairing'
   | 'eeg-capture'
   | 'agent-configuration'
-  | 'ens-claim'
   | 'agent-ready'
   | 'dating-hub'
   | 'completed'

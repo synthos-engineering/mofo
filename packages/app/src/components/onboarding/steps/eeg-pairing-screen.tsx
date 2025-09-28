@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink, Type, Wifi, WifiOff } from 'lucide-react'
 import { MiniKit, VerificationLevel } from '@worldcoin/minikit-js'
+import { useEegConnection } from '@/contexts/EEGConnectionContext'
 
 // QR Scanner types (following mock-scanner-frontend pattern)
 declare global {
@@ -17,6 +18,7 @@ const DEFAULT_RELAYER_URL = 'wss://172.24.244.146:8765'
 
 interface EegPairingScreenProps {
   onComplete: () => void
+  onBack?: () => void
 }
 
 interface EegBoothData {
@@ -24,11 +26,14 @@ interface EegBoothData {
   relayer_url: string
 }
 
-export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
+export function EegPairingScreen({ onComplete, onBack }: EegPairingScreenProps) {
   const [extractedUrl, setExtractedUrl] = useState<string | null>(null)
   const [rawQrText, setRawQrText] = useState<string | null>(null) // For debugging
   const [boothData, setBoothData] = useState<EegBoothData | null>(null)
-  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
+  
+  // Use the persistent EEG connection
+  const { connection, connectToBooth, onMessage } = useEegConnection()
+  const connectionStatus = connection.connectionStatus
   const [error, setError] = useState<string | null>(null)
   const [showManualInput, setShowManualInput] = useState(false)
   const [manualBoothId, setManualBoothId] = useState('')
@@ -37,94 +42,45 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const qrScannerRef = useRef<any>(null)
 
-  // WebSocket connection to EEG booth (exact copy from mock-scanner-frontend)
+  // Enhanced WebSocket connection using persistent context
   const connectToBoothRelay = useCallback(async (data: EegBoothData) => {
-    if (websocketRef.current?.readyState === WebSocket.OPEN) {
-      websocketRef.current.close()
-    }
-
-    setConnectionStatus('connecting')
     setError(null)
 
     try {
-      console.log('🔌 Connecting to EEG booth:', data.booth_id, 'at', data.relayer_url)
+      console.log('🔌 Connecting to EEG booth with persistent connection:', data.booth_id, 'at', data.relayer_url)
       
-      const ws = new WebSocket(data.relayer_url)
-      websocketRef.current = ws
-
-      ws.onopen = () => {
-        console.log('✅ Connected to EEG booth relayer')
-        
-        // Send scanner connection request (exact from mock-scanner-frontend)
-        const connectMessage = {
-          type: 'connect_scanner',
-          booth_id: data.booth_id
-        }
-        
-        ws.send(JSON.stringify(connectMessage))
-        console.log('📤 Sent connection request to booth:', data.booth_id)
-      }
-
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data)
-          console.log('📥 Received from booth relayer:', message)
-          
-          if (message.type === 'connection_success') {
-            setConnectionStatus('connected')
-            console.log('🎉 Successfully connected to EEG booth!')
-            
-            if (MiniKit.isInstalled()) {
-              MiniKit.commands.sendHapticFeedback({
-                hapticsType: 'notification',
-                style: 'success',
-              })
-            }
-
-            // After connection, continue to next step
-            setTimeout(() => {
-              onComplete()
-            }, 1000)
-            
-          } else if (message.type === 'error') {
-            setConnectionStatus('error')
-            setError(`Booth connection failed: ${message.message}`)
-            
-          } else if (message.type === 'booth_disconnected') {
-            setConnectionStatus('disconnected')
-            setError('EEG booth disconnected unexpectedly')
-          }
-        } catch (parseError) {
-          console.error('Error parsing booth message:', parseError)
-        }
-      }
-
-      ws.onclose = () => {
-        console.log('🔌 Disconnected from booth relayer')
-        if (connectionStatus === 'connecting' || connectionStatus === 'connected') {
-          setConnectionStatus('disconnected')
-        }
-      }
-
-      ws.onerror = (wsError) => {
-        console.error('❌ WebSocket connection error:', wsError)
-        setConnectionStatus('error')
-        setError('Failed to connect to EEG booth. Please check the URL and try again.')
+      const success = await connectToBooth(data)
+      
+      if (success) {
+        console.log('🎉 Successfully connected to EEG booth!')
         
         if (MiniKit.isInstalled()) {
           MiniKit.commands.sendHapticFeedback({
             hapticsType: 'notification',
-            style: 'error',
+            style: 'success',
           })
         }
-      }
 
-    } catch (err) {
-      console.error('🚨 Connection setup failed:', err)
-      setConnectionStatus('error')
-      setError('Failed to establish connection to EEG booth')
+        // After connection, continue to next step
+        setTimeout(() => {
+          onComplete()
+        }, 1000)
+      } else {
+        setError('Failed to connect to EEG booth')
+      }
+      
+    } catch (connectionError) {
+      console.error('Failed to connect to EEG booth:', connectionError)
+      setError('Failed to connect to EEG booth. Please check the URL and try again.')
+      
+      if (MiniKit.isInstalled()) {
+        MiniKit.commands.sendHapticFeedback({
+          hapticsType: 'notification',
+          style: 'error',
+        })
+      }
     }
-  }, [connectionStatus, onComplete])
+  }, [connectToBooth, onComplete])
 
   // World ID verification for EEG brain scanning action
   const handleEEGVerification = async () => {
@@ -444,7 +400,10 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Back Button */}
       <div className="px-6 pt-8">
-        <button className="flex items-center text-gray-600 hover:text-gray-800">
+        <button 
+          onClick={onBack}
+          className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+        >
           <ChevronLeft className="w-5 h-5 mr-1" />
           <span>Pair EEG Device</span>
         </button>

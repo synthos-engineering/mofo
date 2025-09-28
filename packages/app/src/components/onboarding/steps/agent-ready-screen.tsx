@@ -5,15 +5,19 @@ import { Bot, ChevronLeft, Heart, MessageCircle, Calendar, Shield, Settings, Glo
 
 interface AgentReadyScreenProps {
   onComplete: () => void
+  onBack?: () => void
 }
 
-export function AgentReadyScreen({ onComplete }: AgentReadyScreenProps) {
+export function AgentReadyScreen({ onComplete, onBack }: AgentReadyScreenProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
       {/* Back Button */}
       <div className="px-6 pt-4">
-        <button className="flex items-center text-gray-600 hover:text-gray-800">
+        <button 
+          onClick={onBack}
+          className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+        >
           <ChevronLeft className="w-5 h-5 mr-1" />
           <span>Agent Created</span>
         </button>
@@ -67,7 +71,7 @@ export function AgentReadyScreen({ onComplete }: AgentReadyScreenProps) {
               </div>
               <div className="flex items-center space-x-1 text-sm text-gray-500">
                 <Globe className="w-3 h-3" />
-                <span>viman.mofo.eth</span>
+                <span>AI Agent</span>
               </div>
             </div>
           </div>
