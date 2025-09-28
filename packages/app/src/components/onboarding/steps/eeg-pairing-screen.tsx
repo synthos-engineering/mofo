@@ -185,16 +185,34 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                 }
               } else {
                 console.error('❌ Missing required fields in QR data:', qrData)
-                setError(`Invalid QR format. Missing booth_id or relayer_url. Found: ${JSON.stringify(qrData)}`)
+                const errorMsg = `Invalid QR format. Missing booth_id or relayer_url. Found: ${JSON.stringify(qrData)}`
+                setError(errorMsg)
                 qrScannerRef.current?.stop()
                 setIsScanning(false)
+                
+                // Send error haptic feedback
+                if (MiniKit.isInstalled()) {
+                  MiniKit.commands.sendHapticFeedback({
+                    hapticsType: 'notification',
+                    style: 'error',
+                  })
+                }
               }
             } catch (parseError) {
               console.error('❌ JSON parse failed:', parseError)
               console.error('❌ Raw QR text was:', result.data)
-              setError(`QR code is not valid JSON. Raw text: "${result.data}"`)
+              const errorMsg = `QR code is not valid JSON. Raw text: "${result.data}"`
+              setError(errorMsg)
               qrScannerRef.current?.stop()
               setIsScanning(false)
+              
+              // Send error haptic feedback
+              if (MiniKit.isInstalled()) {
+                MiniKit.commands.sendHapticFeedback({
+                  hapticsType: 'notification',
+                  style: 'error',
+                })
+              }
             }
           },
           {
@@ -505,32 +523,55 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             </motion.div>
           )}
 
-          {/* Error Display */}
+          {/* Error Display - Enhanced for World App */}
           {error && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50 border border-red-100 rounded-xl p-4 mb-6"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              className="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-6 shadow-lg"
             >
-              <div className="flex items-start space-x-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-                <div className="flex-1">
-                  <div className="font-medium text-red-800 mb-1">❌ Connection Failed</div>
-                  <div className="text-sm text-red-700 mb-3">{error}</div>
-                  
-                  {/* Debug info showing raw QR text */}
-                  {rawQrText && (
-                    <div className="bg-white border border-red-200 rounded-lg p-3 mt-2">
-                      <div className="text-xs text-red-800 mb-1 font-medium">🔍 Debug - Raw QR Text:</div>
-                      <div className="text-xs font-mono text-red-700 break-all bg-red-50 p-2 rounded">
-                        {rawQrText}
-                      </div>
-                      <div className="text-xs text-red-600 mt-2">
-                        Expected format: {`{"booth_id": "booth_123", "relayer_url": "wss://..."}`}
-                      </div>
-                    </div>
-                  )}
+              <div className="text-center mb-4">
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 0.5, repeat: 1 }}
+                >
+                  <AlertTriangle className="w-12 h-12 text-red-600 mx-auto mb-3" />
+                </motion.div>
+                <div className="font-bold text-red-800 text-lg mb-2">❌ QR Scan Failed</div>
+                <div className="text-red-700 font-medium mb-4">{error}</div>
+              </div>
+              
+              {/* Debug info showing raw QR text */}
+              {rawQrText && (
+                <div className="bg-white border border-red-200 rounded-lg p-4">
+                  <div className="text-sm text-red-800 mb-2 font-medium">🔍 What was scanned:</div>
+                  <div className="text-sm font-mono text-red-700 break-all bg-red-50 p-3 rounded mb-3 border">
+                    "{rawQrText}"
+                  </div>
+                  <div className="text-xs text-red-600 bg-red-100 p-2 rounded">
+                    <div className="font-medium mb-1">Expected JSON format:</div>
+                    <div className="font-mono">{`{"booth_id": "booth_123", "relayer_url": "wss://ip:port"}`}</div>
+                  </div>
                 </div>
+              )}
+              
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => {
+                    resetScan()
+                    // Send haptic feedback when clearing error
+                    if (MiniKit.isInstalled()) {
+                      MiniKit.commands.sendHapticFeedback({
+                        hapticsType: 'impact',
+                        style: 'light',
+                      })
+                    }
+                  }}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors"
+                >
+                  🔄 Try Again
+                </button>
               </div>
             </motion.div>
           )}
@@ -576,15 +617,42 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                               setError(null)
                               connectToBoothRelay(qrData)
                             } else {
-                              setError(`Invalid booth format. Found: ${JSON.stringify(qrData)}`)
+                              const errorMsg = `Invalid booth format. Found: ${JSON.stringify(qrData)}`
+                              setError(errorMsg)
+                              
+                              // Send error haptic feedback
+                              if (MiniKit.isInstalled()) {
+                                MiniKit.commands.sendHapticFeedback({
+                                  hapticsType: 'notification',
+                                  style: 'error',
+                                })
+                              }
                             }
                           } catch (parseError) {
-                            setError(`QR is not valid JSON. Raw text: "${qrResult}"`)
+                            const errorMsg = `QR is not valid JSON. Raw text: "${qrResult}"`
+                            setError(errorMsg)
+                            
+                            // Send error haptic feedback
+                            if (MiniKit.isInstalled()) {
+                              MiniKit.commands.sendHapticFeedback({
+                                hapticsType: 'notification',
+                                style: 'error',
+                              })
+                            }
                           }
                           
                         } catch (qrError) {
                           console.error('❌ QR detection failed in photo:', qrError)
-                          setError('No QR code found in photo. Please take a clearer picture.')
+                          const errorMsg = 'No QR code found in photo. Please take a clearer picture.'
+                          setError(errorMsg)
+                          
+                          // Send error haptic feedback
+                          if (MiniKit.isInstalled()) {
+                            MiniKit.commands.sendHapticFeedback({
+                              hapticsType: 'notification',
+                              style: 'error',
+                            })
+                          }
                         }
                         
                         if (MiniKit.isInstalled()) {
