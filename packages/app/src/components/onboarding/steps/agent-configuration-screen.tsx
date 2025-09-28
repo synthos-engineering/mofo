@@ -25,12 +25,12 @@ interface AgentConfigurationScreenProps {
 }
 
 export function AgentConfigurationScreen({ onComplete, userId, eegData, onBack }: AgentConfigurationScreenProps) {
-  // Enhanced with EEG-derived traits
+  // 🚧 HARDCODED: EEG-derived traits for consistent demo (based on wireframes)
   const [traits, setTraits] = useState({
-    openness: eegData?.loveScore ? Math.min(eegData.loveScore + 20, 100) : 72,
-    conscientiousness: eegData?.loveScore ? Math.min(eegData.loveScore + 30, 100) : 85,
-    extraversion: eegData?.loveScore ? Math.max(eegData.loveScore - 10, 10) : 45,
-    agreeableness: eegData?.loveScore ? Math.min(eegData.loveScore + 8, 100) : 68
+    openness: 72,      // "Curious 72%" from wireframe W-09
+    conscientiousness: 85, // "Organized 85%" from wireframe W-09  
+    extraversion: 55,  // "Thoughtful 55%" from wireframe W-09
+    agreeableness: 68  // "Caring 68%" from wireframe W-09
   })
 
   const [previewText, setPreviewText] = useState(

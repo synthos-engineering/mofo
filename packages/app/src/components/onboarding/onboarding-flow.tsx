@@ -6,7 +6,7 @@ import { VerificationCompleteScreen } from './steps/verification-complete-screen
 import { EegPairingScreen } from './steps/eeg-pairing-screen'
 import { EegCaptureScreen } from './steps/eeg-capture-screen'
 import { AgentConfigurationScreen } from './steps/agent-configuration-screen'
-
+import { EnsClaimScreen } from './steps/ens-claim-screen'
 import { AgentReadyScreen } from './steps/agent-ready-screen'
 import { useState } from 'react'
 import { EegConnectionProvider } from '@/contexts/EEGConnectionContext'
@@ -47,6 +47,7 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
       'eeg-pairing',
       'eeg-capture',
       'agent-configuration',
+      'ens-claim',
       'agent-ready',
       'dating-hub'
     ]
@@ -118,8 +119,8 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
             userId={authState.user?.id || authState.walletAddress || undefined}
             eegData={authState.user?.eegData}
             onComplete={(agentCreationData) => {
-              // Store agent data in user object and skip ENS - go directly to agent ready
-              onStepComplete('agent-ready', {
+              // Continue to ENS claim step
+              onStepComplete('ens-claim', {
                 user: {
                   ...authState.user,
                   agentId: agentCreationData.agentId,
@@ -131,10 +132,29 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
           />
         )
       
+      case 'ens-claim':
+        return (
+          <EnsClaimScreen 
+            onComplete={(ensName) => {
+              // Continue to agent ready with ENS name
+              onStepComplete('agent-ready', {
+                user: {
+                  ...authState.user,
+                  ensName: ensName
+                } as any
+              })
+            }}
+            agentId={(authState.user as any)?.agentId}
+            onBack={handleBackNavigation}
+          />
+        )
+      
       case 'agent-ready':
         return (
           <AgentReadyScreen 
             onComplete={() => onStepComplete('dating-hub')}
+            ensName={(authState.user as any)?.ensName}
+            agentId={(authState.user as any)?.agentId}
             onBack={handleBackNavigation}
           />
         )

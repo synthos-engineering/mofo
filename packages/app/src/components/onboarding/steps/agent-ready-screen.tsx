@@ -5,10 +5,12 @@ import { Bot, ChevronLeft, Heart, MessageCircle, Calendar, Shield, Settings, Glo
 
 interface AgentReadyScreenProps {
   onComplete: () => void
+  ensName?: string
+  agentId?: string
   onBack?: () => void
 }
 
-export function AgentReadyScreen({ onComplete, onBack }: AgentReadyScreenProps) {
+export function AgentReadyScreen({ onComplete, ensName, agentId, onBack }: AgentReadyScreenProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
@@ -63,7 +65,9 @@ export function AgentReadyScreen({ onComplete, onBack }: AgentReadyScreenProps) 
             </div>
             <div className="flex-1">
               <div className="flex items-center space-x-2">
-                <h3 className="font-semibold text-gray-900">Viman's Agent</h3>
+                <h3 className="font-semibold text-gray-900">
+                  {ensName ? ensName.split('.')[0] : 'Viman'}'s Agent
+                </h3>
                 <div className="flex items-center space-x-1">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span className="text-xs text-green-600">Active</span>

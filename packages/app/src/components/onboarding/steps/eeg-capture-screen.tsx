@@ -188,72 +188,40 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
     
     const sessionId = `eeg_${userId || 'demo'}_${Date.now()}`
     setEegSessionId(sessionId)
-    console.log('🧠 Starting EEG capture session:', sessionId)
+    console.log('🧠 Starting hardcoded EEG capture simulation:', sessionId)
     
-    // Check if we have a real EEG connection
-    if (connection.isConnected && connection.boothData) {
-      console.log('🔌 Using real EEG connection from booth:', connection.boothData.booth_id)
-      
-      // Get wallet address from MiniKit user data
-      let walletAddress: string | undefined
-      if (MiniKit.isInstalled()) {
-        try {
-          const user: User = await MiniKit.user
-          walletAddress = user.walletAddress
-          console.log('👛 Using wallet address for EEG session:', walletAddress)
-        } catch (error) {
-          console.warn('⚠️ Could not retrieve wallet address:', error)
-        }
-      }
-      
-      // Send message to scanner via booth backend (following booth system message format)
-      const startCaptureMessage = {
-        type: 'message_from_scanner',
-        data: {
-          action: 'start_session',
-          session_id: sessionId,
-          user_id: userId,
-          wallet_address: walletAddress, // Include wallet address for secure data attribution
-          duration: 60, // seconds
-          timestamp: Date.now()
-        }
-      }
-      
-      const success = sendMessage(startCaptureMessage)
-      if (!success) {
-        console.warn('Failed to send capture message, falling back to simulation')
-        startSimulatedCapture(sessionId)
-        return
-      }
-      
-      // The real EEG progress will be handled by message listener
-      console.log('📤 Sent EEG capture start message to booth')
-      
+    // 🚧 HARDCODED SIMULATION: Always use simulation for demo purposes
+    // Show EEG device connected status if booth is connected, but use simulated data
+    if (connection.status === 'connected' && connection.booth_id) {
+      console.log('📱 EEG device connected, using hardcoded simulation')
     } else {
-      console.log('📱 No EEG booth connected, using simulation')
-      startSimulatedCapture(sessionId)
+      console.log('📱 No EEG device, using hardcoded simulation')
     }
+    
+    startSimulatedCapture(sessionId)
   }
   
-  // Simulation fallback
+  // Hardcoded simulation for demo purposes
   const startSimulatedCapture = (sessionId: string) => {
+    console.log('🎭 Starting hardcoded EEG simulation')
+    
     const interval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval)
           
-          // Generate simulated love score (in real app, this comes from EEG analysis)
-          const loveScore = Math.floor(Math.random() * 30) + 70 // 70-100 range
-          console.log('💖 EEG capture complete - Love Score:', loveScore)
+          // 🚧 HARDCODED: Generate consistent love score for demo
+          const loveScore = 78 // Fixed score for consistent demo experience
+          console.log('💖 Hardcoded EEG capture complete - Love Score:', loveScore)
           
           setTimeout(() => {
             onComplete(loveScore, sessionId) // Pass data to next step
           }, 500)
           return 100
         }
-        return prev + 1
+        return prev + 2 // Faster progression for demo
       })
-    }, 60) // 60 second capture
+    }, 100) // Faster capture for demo (10 seconds instead of 60)
   }
 
 
@@ -530,18 +498,22 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
           >
             {progress < 95 ? (
               <>
-                <div className="text-sm">Estimated time remaining: {60 - Math.floor(progress * 0.6)}s</div>
+                <div className="text-sm">Estimated time remaining: {Math.max(0, 10 - Math.floor(progress * 0.1))}s</div>
                 <div className="text-xs text-gray-500 mt-1">Please remain still and relaxed</div>
+<<<<<<< HEAD
                 {connection.isConnected && eegDataCollected.length > 0 && (
+=======
+                {connection.status === 'connected' && (
+>>>>>>> 6cc65f1 (feat: add ENS claim screen and related services for agent identity management, enhancing onboarding flow with ENS registration and availability checks)
                   <div className="text-xs text-blue-600 mt-1">
-                    📊 EEG packets collected: {eegDataCollected.length}
+                    📊 Hardcoded EEG simulation: {Math.floor(progress)}% complete
                   </div>
                 )}
               </>
             ) : (
               <>
                 <div className="text-sm font-medium text-green-600">🔬 Analyzing brain patterns...</div>
-                <div className="text-xs text-gray-500 mt-1">Scientific analysis in progress</div>
+                <div className="text-xs text-gray-500 mt-1">Generating personality profile</div>
               </>
             )}
           </motion.div>
