@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink, Type } from 'lucide-react'
+import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink, Type, Wifi, WifiOff } from 'lucide-react'
 import { MiniKit } from '@worldcoin/minikit-js'
 import { Html5Qrcode } from 'html5-qrcode'
 
@@ -10,14 +10,112 @@ interface EegPairingScreenProps {
   onComplete: () => void
 }
 
+interface EegBoothData {
+  booth_id: string
+  relayer_url: string
+}
+
 export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [extractedUrl, setExtractedUrl] = useState<string | null>(null)
+  const [boothData, setBoothData] = useState<EegBoothData | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
   const [error, setError] = useState<string | null>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
   const [showManualInput, setShowManualInput] = useState(false)
   const [manualUrl, setManualUrl] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const websocketRef = useRef<WebSocket | null>(null)
+
+  // WebSocket connection to EEG booth (based on mock-scanner-frontend)
+  const connectToBoothRelay = useCallback(async (data: EegBoothData) => {
+    if (websocketRef.current?.readyState === WebSocket.OPEN) {
+      websocketRef.current.close()
+    }
+
+    setConnectionStatus('connecting')
+    setError(null)
+
+    try {
+      console.log('🔌 Connecting to EEG booth:', data.booth_id, 'at', data.relayer_url)
+      
+      const ws = new WebSocket(data.relayer_url)
+      websocketRef.current = ws
+
+      ws.onopen = () => {
+        console.log('✅ Connected to EEG booth relayer')
+        
+        // Send scanner connection request
+        const connectMessage = {
+          type: 'connect_scanner',
+          booth_id: data.booth_id
+        }
+        
+        ws.send(JSON.stringify(connectMessage))
+        console.log('📤 Sent connection request to booth:', data.booth_id)
+      }
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+          console.log('📥 Received from booth relayer:', message)
+          
+          if (message.type === 'connection_success') {
+            setConnectionStatus('connected')
+            console.log('🎉 Successfully connected to EEG booth!')
+            
+            // Send haptic feedback for success
+            if (MiniKit.isInstalled()) {
+              MiniKit.commands.sendHapticFeedback({
+                hapticsType: 'notification',
+                style: 'success',
+              })
+            }
+
+            // Auto-proceed to EEG capture after successful connection
+            setTimeout(() => {
+              onComplete()
+            }, 2000)
+            
+          } else if (message.type === 'error') {
+            setConnectionStatus('error')
+            setError(`Booth connection failed: ${message.message}`)
+            
+          } else if (message.type === 'booth_disconnected') {
+            setConnectionStatus('disconnected')
+            setError('EEG booth disconnected unexpectedly')
+          }
+        } catch (parseError) {
+          console.error('Error parsing booth message:', parseError)
+        }
+      }
+
+      ws.onclose = () => {
+        console.log('🔌 Disconnected from booth relayer')
+        if (connectionStatus === 'connecting' || connectionStatus === 'connected') {
+          setConnectionStatus('disconnected')
+        }
+      }
+
+      ws.onerror = (wsError) => {
+        console.error('❌ WebSocket connection error:', wsError)
+        setConnectionStatus('error')
+        setError('Failed to connect to EEG booth. Please check the URL and try again.')
+        
+        if (MiniKit.isInstalled()) {
+          MiniKit.commands.sendHapticFeedback({
+            hapticsType: 'notification',
+            style: 'error',
+          })
+        }
+      }
+
+    } catch (err) {
+      console.error('🚨 Connection setup failed:', err)
+      setConnectionStatus('error')
+      setError('Failed to establish connection to EEG booth')
+    }
+  }, [connectionStatus, onComplete])
 
   const processImage = async (file: File) => {
     setIsProcessing(true)
@@ -30,20 +128,41 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
       const imageUrl = URL.createObjectURL(file)
       setCapturedImage(imageUrl)
 
-      // Use Html5Qrcode - more reliable than other libraries
+      // Use Html5Qrcode for better detection
       console.log('🔍 Starting QR detection with Html5Qrcode...')
       
-      const html5QrCode = new Html5Qrcode("dummy-id") // dummy ID for file scanning
+      const html5QrCode = new Html5Qrcode("dummy-id")
       
       try {
         const result = await html5QrCode.scanFile(file, true)
         
-        console.log('✅ QR Code successfully detected!')
-        console.log('📄 QR Code data:', result)
-        
+        console.log('✅ QR Code detected:', result)
         setExtractedUrl(result)
         
-        // Send success haptic
+        // Try to parse as booth JSON data
+        try {
+          const parsed = JSON.parse(result) as EegBoothData
+          if (parsed.booth_id && parsed.relayer_url) {
+            setBoothData(parsed)
+            console.log('🏢 Booth data parsed:', parsed)
+            
+            // Auto-connect to booth
+            connectToBoothRelay(parsed)
+          } else {
+            // Treat as plain URL
+            setBoothData({
+              booth_id: `booth_${Date.now()}`,
+              relayer_url: result
+            })
+          }
+        } catch (jsonError) {
+          // Not JSON, treat as URL
+          setBoothData({
+            booth_id: `booth_${Date.now()}`,
+            relayer_url: result
+          })
+        }
+        
         if (MiniKit.isInstalled()) {
           MiniKit.commands.sendHapticFeedback({
             hapticsType: 'notification',
@@ -64,8 +183,6 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
       }
       
       setIsProcessing(false)
-      
-      // Cleanup
       URL.revokeObjectURL(imageUrl)
 
     } catch (err) {
@@ -79,7 +196,18 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
     if (manualUrl.trim()) {
       console.log('📝 Manual URL entered:', manualUrl)
       setExtractedUrl(manualUrl.trim())
+      
+      // Create booth data from manual URL
+      const data: EegBoothData = {
+        booth_id: `manual_booth_${Date.now()}`,
+        relayer_url: manualUrl.trim()
+      }
+      
+      setBoothData(data)
       setShowManualInput(false)
+      
+      // Connect to booth
+      connectToBoothRelay(data)
       
       if (MiniKit.isInstalled()) {
         MiniKit.commands.sendHapticFeedback({
@@ -99,7 +227,6 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
   }
 
   const handleContinue = () => {
-    // Send haptic feedback
     if (MiniKit.isInstalled()) {
       MiniKit.commands.sendHapticFeedback({
         hapticsType: 'impact',
@@ -115,8 +242,43 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
     setCapturedImage(null)
     setShowManualInput(false)
     setManualUrl('')
+    setBoothData(null)
+    setConnectionStatus('disconnected')
+    
+    // Close any open WebSocket connections
+    if (websocketRef.current) {
+      websocketRef.current.close()
+    }
+    
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
+    }
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (websocketRef.current) {
+        websocketRef.current.close()
+      }
+    }
+  }, [])
+
+  const getConnectionStatusIcon = () => {
+    switch (connectionStatus) {
+      case 'connected': return <Wifi className="w-5 h-5 text-green-600" />
+      case 'connecting': return <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      case 'error': return <WifiOff className="w-5 h-5 text-red-600" />
+      default: return <WifiOff className="w-5 h-5 text-gray-400" />
+    }
+  }
+
+  const getConnectionStatusText = () => {
+    switch (connectionStatus) {
+      case 'connected': return 'Connected to EEG Booth'
+      case 'connecting': return 'Connecting to Booth...'
+      case 'error': return 'Connection Failed'
+      default: return 'Not Connected'
     }
   }
 
@@ -140,6 +302,37 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
             Take a clear photo of the QR code on your EEG station to establish a secure connection
           </p>
         </div>
+
+        {/* Connection Status */}
+        {boothData && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`rounded-xl p-4 mb-6 ${
+              connectionStatus === 'connected' ? 'bg-green-50 border border-green-100' :
+              connectionStatus === 'connecting' ? 'bg-blue-50 border border-blue-100' :
+              connectionStatus === 'error' ? 'bg-red-50 border border-red-100' :
+              'bg-gray-50 border border-gray-100'
+            }`}
+          >
+            <div className="flex items-center space-x-3">
+              {getConnectionStatusIcon()}
+              <div className="flex-1">
+                <div className={`font-medium ${
+                  connectionStatus === 'connected' ? 'text-green-800' :
+                  connectionStatus === 'connecting' ? 'text-blue-800' :
+                  connectionStatus === 'error' ? 'text-red-800' :
+                  'text-gray-800'
+                }`}>
+                  {getConnectionStatusText()}
+                </div>
+                <div className="text-sm text-gray-600">
+                  Booth ID: {boothData.booth_id}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Photo Tips */}
         {!extractedUrl && (
@@ -229,7 +422,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
               <div className="flex items-start space-x-3">
                 <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
                 <div className="flex-1">
-                  <div className="font-medium text-green-800 mb-2">🔗 QR Code URL Extracted:</div>
+                  <div className="font-medium text-green-800 mb-2">🔗 EEG Booth URL Extracted:</div>
                   <div className="bg-white border border-green-200 rounded-lg p-3 mb-3">
                     <div className="flex items-start space-x-2">
                       <ExternalLink className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -239,25 +432,8 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                     </div>
                   </div>
                   <div className="text-sm text-green-700">
-                    ✅ This URL will be used to connect to your EEG station.
+                    ✅ Establishing WebSocket connection to EEG station...
                   </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Error Display */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-red-50 border border-red-100 rounded-xl p-4 mb-6"
-            >
-              <div className="flex items-start space-x-3">
-                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-                <div>
-                  <div className="font-medium text-red-800 mb-1">❌ Scan Failed</div>
-                  <div className="text-sm text-red-700">{error}</div>
                 </div>
               </div>
             </motion.div>
@@ -280,7 +456,7 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                   type="url"
                   value={manualUrl}
                   onChange={(e) => setManualUrl(e.target.value)}
-                  placeholder="ws://192.168.1.100:8765 or https://eeg-station.local"
+                  placeholder="wss://192.168.1.100:8765 or ws://eeg-station.local"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm font-mono"
                 />
                 
@@ -301,6 +477,23 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                   >
                     Cancel
                   </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Error Display */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-red-50 border border-red-100 rounded-xl p-4 mb-6"
+            >
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                <div>
+                  <div className="font-medium text-red-800 mb-1">❌ Connection Failed</div>
+                  <div className="text-sm text-red-700">{error}</div>
                 </div>
               </div>
             </motion.div>
@@ -346,34 +539,27 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                   className="hidden"
                   onChange={handleFileChange}
                 />
-
-                {(error || capturedImage) && (
-                  <button
-                    onClick={resetScan}
-                    className="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-300 transition-colors"
-                  >
-                    🔄 Take New Photo
-                  </button>
-                )}
               </div>
             )}
 
-            {extractedUrl && (
-              <div className="space-y-3">
-                <button
-                  onClick={handleContinue}
-                  className="w-full bg-green-600 text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg hover:bg-green-700 transition-colors"
-                >
-                  ✅ Connect to EEG Station
-                </button>
-                
-                <button
-                  onClick={resetScan}
-                  className="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-300 transition-colors"
-                >
-                  📸 Scan Different QR Code
-                </button>
-              </div>
+            {/* Connection established - proceed button */}
+            {connectionStatus === 'connected' && (
+              <button
+                onClick={handleContinue}
+                className="w-full bg-green-600 text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg hover:bg-green-700 transition-colors"
+              >
+                ✅ Proceed to EEG Capture
+              </button>
+            )}
+
+            {/* Retry/Reset Options */}
+            {(error || capturedImage || extractedUrl) && connectionStatus !== 'connected' && (
+              <button
+                onClick={resetScan}
+                className="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-medium hover:bg-gray-300 transition-colors"
+              >
+                🔄 Try Different Connection
+              </button>
             )}
           </div>
         </div>
