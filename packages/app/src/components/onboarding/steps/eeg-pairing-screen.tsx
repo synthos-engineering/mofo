@@ -125,12 +125,19 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
     }
   }, [connectionStatus, onComplete])
 
-  // QR Scanner implementation (exact copy from mock-scanner-frontend)
+  // QR Scanner implementation with iPhone/Safari fixes
   const startQRScanning = async () => {
     try {
       setIsScanning(true)
       setError(null)
       console.log('🎬 Starting QR scanning...')
+      console.log('📱 User Agent:', navigator.userAgent)
+      console.log('🌐 Platform:', navigator.platform)
+      
+      // Check camera availability first
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera not available on this device')
+      }
       
       // Import QR Scanner dynamically (same as mock-scanner-frontend)
       const QrScanner = (await import('qr-scanner')).default
@@ -138,6 +145,15 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
       
       if (videoRef.current) {
         console.log('📹 Video element found, creating QR scanner...')
+        
+        // Add video event listeners for debugging
+        const video = videoRef.current
+        video.onloadstart = () => console.log('📹 Video load start')
+        video.onloadedmetadata = () => console.log('📹 Video metadata loaded')
+        video.oncanplay = () => console.log('📹 Video can play')
+        video.onplay = () => console.log('📹 Video playing')
+        video.onerror = (e) => console.error('📹 Video error:', e)
+        
         qrScannerRef.current = new QrScanner(
           videoRef.current,
           (result: any) => {
@@ -185,6 +201,16 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
         await qrScannerRef.current.start()
         console.log('✅ QR Scanner started successfully')
         console.log('📹 Video should now be visible')
+        
+        // Additional debugging for iPhone
+        setTimeout(() => {
+          if (videoRef.current) {
+            console.log('📹 Video dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight)
+            console.log('📹 Video ready state:', videoRef.current.readyState)
+            console.log('📹 Video paused:', videoRef.current.paused)
+          }
+        }, 2000)
+        
       } else {
         console.error('❌ Video element not found')
         setError('Video element not available')
@@ -192,8 +218,16 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
       }
     } catch (error) {
       console.error('❌ Error starting QR scanner:', error)
+      console.error('❌ Full error details:', error)
       setIsScanning(false)
-      setError('Camera access required for QR scanning. Please allow camera permissions.')
+      
+      // More specific error message for iPhone users
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      if (isIOS) {
+        setError('Camera access failed on iPhone. Please ensure camera permissions are enabled in World App settings.')
+      } else {
+        setError('Camera access required for QR scanning. Please allow camera permissions.')
+      }
       
       if (MiniKit.isInstalled()) {
         MiniKit.commands.sendHapticFeedback({
@@ -389,18 +423,29 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
               
               <div className="relative rounded-lg overflow-hidden bg-black" style={{ height: '300px' }}>
                 <video 
-                  ref={videoRef} 
+                  ref={videoRef}
+                  playsInline
+                  muted
+                  autoPlay
+                  controls={false}
+                  webkit-playsinline="true"
                   style={{
                     width: '100%',
                     height: '300px',
                     objectFit: 'cover',
-                    backgroundColor: '#000'
+                    backgroundColor: '#000',
+                    display: 'block'
                   }}
                 />
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
                   <div className="bg-black/80 text-white px-4 py-2 rounded-lg text-sm font-medium">
                     📷 Point camera at QR code
                   </div>
+                </div>
+                
+                {/* Debug overlay for iPhone */}
+                <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-xs">
+                  📱 Video Status: {isScanning ? 'Active' : 'Inactive'}
                 </div>
               </div>
             </motion.div>
@@ -481,6 +526,36 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
                 >
                   <Camera className="w-5 h-5" />
                   <span>📷 Scan QR Code with Camera</span>
+                </button>
+
+                {/* iPhone-friendly photo capture as primary option */}
+                <button
+                  onClick={() => {
+                    const input = document.createElement('input')
+                    input.type = 'file'
+                    input.accept = 'image/*'
+                    input.capture = 'environment'
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0]
+                      if (file) {
+                        console.log('📸 Photo captured via direct input:', file.name)
+                        // For now just show success (you can add QR processing here)
+                        setError('Photo captured! QR processing would happen here.')
+                        
+                        if (MiniKit.isInstalled()) {
+                          MiniKit.commands.sendHapticFeedback({
+                            hapticsType: 'notification',
+                            style: 'success',
+                          })
+                        }
+                      }
+                    }
+                    input.click()
+                  }}
+                  className="w-full bg-green-600 text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg flex items-center justify-center space-x-2 hover:bg-green-700 transition-colors"
+                >
+                  <Camera className="w-5 h-5" />
+                  <span>📸 Take Photo of QR Code (iPhone)</span>
                 </button>
 
                 <button
