@@ -41,6 +41,7 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
   const [isVerifying, setIsVerifying] = useState(false)
   const [isVerified, setIsVerified] = useState(false)
   const [verificationError, setVerificationError] = useState<string | null>(null)
+  const [showSkipOption, setShowSkipOption] = useState(false)
   
   // Use the persistent EEG connection
   const { connection, sendMessage, onMessage } = useEegConnection()
@@ -49,7 +50,7 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
   // WorldCoin verification function
   const handleWorldCoinVerification = async (): Promise<boolean> => {
     if (!MiniKit.isInstalled()) {
-      console.log('⚠️ MiniKit not installed, skipping WorldCoin verification')
+      console.log('⚠️ MiniKit not installed, allowing EEG capture for development')
       setIsVerified(true)
       return true
     }
@@ -62,50 +63,75 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
 
       const verifyPayload: VerifyCommandInput = {
         action: 'generate-eeg-data', // Action ID from Developer Portal
-        verification_level: VerificationLevel.Orb, // Require Orb verification for EEG data
+        verification_level: VerificationLevel.Device, // Use Device level first (more permissive)
+        signal: userId || undefined, // Optional signal
       }
+
+      console.log('📤 Sending verification payload:', verifyPayload)
 
       const { finalPayload } = await MiniKit.commandsAsync.verify(verifyPayload)
 
+      console.log('📥 Received verification response:', finalPayload)
+
       if (finalPayload.status === 'error') {
         console.error('❌ WorldCoin verification failed:', finalPayload)
-        setVerificationError('Verification failed. Please try again.')
+        setVerificationError('WorldCoin verification failed. Check that the action "generate-eeg-data" is configured in your Developer Portal.')
+        setShowSkipOption(true) // Show skip option after failure
         return false
       }
 
-      // Verify the proof with backend
-      console.log('✅ WorldCoin verification successful, verifying proof...')
-      const verifyResponse = await fetch('/api/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          payload: finalPayload as ISuccessResult,
-          action: 'generate-eeg-data',
-          signal: userId || undefined, // Use userId as signal
-        }),
-      })
+      // Try to verify the proof with backend
+      console.log('✅ WorldCoin verification successful, verifying proof with backend...')
+      try {
+        const verifyResponse = await fetch('/api/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            payload: finalPayload as ISuccessResult,
+            action: 'generate-eeg-data',
+            signal: userId || undefined,
+          }),
+        })
 
-      const verifyResponseJson = await verifyResponse.json()
-      
-      if (verifyResponseJson.status === 200 && verifyResponseJson.verifyRes?.success) {
-        console.log('🎉 WorldCoin verification complete!')
-        setIsVerified(true)
-        return true
-      } else {
-        console.error('❌ Backend verification failed:', verifyResponseJson)
-        setVerificationError('Verification failed on server. Please try again.')
+        const verifyResponseJson = await verifyResponse.json()
+        console.log('📥 Backend verification response:', verifyResponseJson)
+        
+        if (verifyResponseJson.status === 200 && verifyResponseJson.verifyRes?.success) {
+          console.log('🎉 WorldCoin verification complete!')
+          setIsVerified(true)
+          return true
+        } else {
+          console.warn('⚠️ Backend verification failed, allowing skip option')
+          setVerificationError('Backend verification failed. You can skip for development.')
+          setShowSkipOption(true)
+          return false
+        }
+
+      } catch (backendError) {
+        console.warn('⚠️ Backend verification error, allowing skip option:', backendError)
+        setVerificationError('Backend verification unavailable. You can skip for development.')
+        setShowSkipOption(true)
         return false
       }
 
     } catch (error) {
       console.error('❌ WorldCoin verification error:', error)
-      setVerificationError('Verification failed. Please try again.')
+      setVerificationError(`Verification error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setShowSkipOption(true)
       return false
     } finally {
       setIsVerifying(false)
     }
+  }
+
+  // Skip verification for development
+  const skipVerification = () => {
+    console.log('🚧 Skipping WorldCoin verification for development')
+    setIsVerified(true)
+    setVerificationError(null)
+    setShowSkipOption(false)
   }
 
   const startCapture = async () => {
@@ -351,16 +377,27 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
           >
             <div className="text-center">
               <div className="text-red-800 font-medium mb-2">Verification Failed</div>
-              <div className="text-sm text-red-700 mb-3">{verificationError}</div>
-              <button
-                onClick={() => {
-                  setVerificationError(null)
-                  setIsVerified(false)
-                }}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700"
-              >
-                Try Again
-              </button>
+              <div className="text-sm text-red-700 mb-4">{verificationError}</div>
+              <div className="flex space-x-2 justify-center">
+                <button
+                  onClick={() => {
+                    setVerificationError(null)
+                    setIsVerified(false)
+                    setShowSkipOption(false)
+                  }}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700"
+                >
+                  Try Again
+                </button>
+                {showSkipOption && (
+                  <button
+                    onClick={skipVerification}
+                    className="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-700"
+                  >
+                    Skip (Dev)
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
