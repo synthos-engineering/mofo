@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # ASI Service
+  asi-service:
+    build: .
+    container_name: mofo-asi
+    ports:
+      - "4000:4000"  # API Proxy
+      - "4001:4001"  # WebSocket
+      - "8000:8000"  # uAgent endpoint
+    environment:
+      - NODE_ENV=development
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - mofo-network
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+
+  # Redis for Queue Management
+  redis:
+    image: redis:7-alpine
+    container_name: mofo-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - mofo-network
+    volumes:
+      - redis-data:/data
+
+  # Optional: Local Agentverse simulator for development
+  agentverse-simulator:
+    image: fetchai/agentverse-simulator:latest
+    container_name: mofo-agentverse
+    ports:
+      - "8080:8080"
+    networks:
+      - mofo-network
+    environment:
+      - SIMULATOR_MODE=development
+      - NETWORK=testnet
+
+networks:
+  mofo-network:
+    driver: bridge
+
+volumes:
+  redis-data:
