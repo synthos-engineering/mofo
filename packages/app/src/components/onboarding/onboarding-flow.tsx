@@ -82,7 +82,6 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
         return (
           <VerificationCompleteScreen 
             onComplete={() => onStepComplete('eeg-pairing')}
-            onBack={handleBackNavigation}
           />
         )
       
@@ -90,7 +89,6 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
         return (
           <EegPairingScreen 
             onComplete={() => onStepComplete('eeg-capture')}
-            onBack={handleBackNavigation}
           />
         )
       
@@ -109,7 +107,6 @@ export function OnboardingFlow({ authState, onStepComplete }: OnboardingFlowProp
                 }
               })
             }}
-            onBack={handleBackNavigation}
           />
         )
       
