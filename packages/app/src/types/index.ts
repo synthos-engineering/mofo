@@ -59,6 +59,7 @@ export type OnboardingStep =
   | 'eeg-pairing'
   | 'eeg-capture'
   | 'agent-configuration'
+  | 'ens-claim'
   | 'agent-ready'
   | 'dating-hub'
   | 'completed'

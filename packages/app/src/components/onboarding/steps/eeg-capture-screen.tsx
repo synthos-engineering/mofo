@@ -192,7 +192,7 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
     
     // 🚧 HARDCODED SIMULATION: Always use simulation for demo purposes
     // Show EEG device connected status if booth is connected, but use simulated data
-    if (connection.status === 'connected' && connection.booth_id) {
+    if (connection.connectionStatus === 'connected' && connection.boothData) {
       console.log('📱 EEG device connected, using hardcoded simulation')
     } else {
       console.log('📱 No EEG device, using hardcoded simulation')
@@ -440,11 +440,7 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
               <>
                 <div className="text-sm">Estimated time remaining: {Math.max(0, 10 - Math.floor(progress * 0.1))}s</div>
                 <div className="text-xs text-gray-500 mt-1">Please remain still and relaxed</div>
-<<<<<<< HEAD
-                {connection.isConnected && eegDataCollected.length > 0 && (
-=======
-                {connection.status === 'connected' && (
->>>>>>> 6cc65f1 (feat: add ENS claim screen and related services for agent identity management, enhancing onboarding flow with ENS registration and availability checks)
+                {connection.connectionStatus === 'connected' && (
                   <div className="text-xs text-blue-600 mt-1">
                     📊 Hardcoded EEG simulation: {Math.floor(progress)}% complete
                   </div>
