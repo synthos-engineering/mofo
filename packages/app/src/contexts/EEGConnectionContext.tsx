@@ -22,7 +22,7 @@ interface EegConnectionContextType {
   connection: EegConnectionState
   
   // Connection management
-  connectToBooth: (boothData: EegBoothData) => Promise<boolean>
+  connectToBooth: (boothData: EegBoothData, walletAddress?: string) => Promise<boolean>
   disconnectFromBooth: () => void
   sendMessage: (message: any) => boolean
   
@@ -51,8 +51,8 @@ export function EegConnectionProvider({ children }: { children: React.ReactNode 
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Connect to EEG booth
-  const connectToBooth = useCallback(async (boothData: EegBoothData): Promise<boolean> => {
-    console.log('🔌 Connecting to EEG booth:', boothData)
+  const connectToBooth = useCallback(async (boothData: EegBoothData, walletAddress?: string): Promise<boolean> => {
+    console.log('🔌 Connecting to EEG booth:', boothData, 'with wallet:', walletAddress)
     
     // Close existing connection
     if (websocketRef.current) {
@@ -88,10 +88,11 @@ export function EegConnectionProvider({ children }: { children: React.ReactNode 
             error: null
           }))
 
-          // Send initial connection message
+          // Send initial connection message with wallet address
           const connectMessage = {
             type: 'booth_connect',
             booth_id: boothData.booth_id,
+            wallet_address: walletAddress, // Include wallet address from MiniKit
             timestamp: Date.now()
           }
           

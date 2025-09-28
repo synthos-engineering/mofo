@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink, Type, Wifi, WifiOff } from 'lucide-react'
-import { MiniKit, VerificationLevel } from '@worldcoin/minikit-js'
+import { MiniKit, VerificationLevel, User } from '@worldcoin/minikit-js'
 import { useEegConnection } from '@/contexts/EEGConnectionContext'
 
 // QR Scanner types (following mock-scanner-frontend pattern)
@@ -49,7 +49,19 @@ export function EegPairingScreen({ onComplete, onBack }: EegPairingScreenProps) 
     try {
       console.log('🔌 Connecting to EEG booth with persistent connection:', data.booth_id, 'at', data.relayer_url)
       
-      const success = await connectToBooth(data)
+      // Get wallet address from MiniKit user data
+      let walletAddress: string | undefined
+      if (MiniKit.isInstalled()) {
+        try {
+          const user: User = await MiniKit.user
+          walletAddress = user.walletAddress
+          console.log('👛 Retrieved wallet address from MiniKit:', walletAddress)
+        } catch (error) {
+          console.warn('⚠️ Could not retrieve wallet address from MiniKit:', error)
+        }
+      }
+      
+      const success = await connectToBooth(data, walletAddress)
       
       if (success) {
         console.log('🎉 Successfully connected to EEG booth!')
@@ -354,14 +366,10 @@ export function EegPairingScreen({ onComplete, onBack }: EegPairingScreenProps) 
     setShowManualInput(false)
     setManualBoothId('')
     setBoothData(null)
-    setConnectionStatus('disconnected')
     
-    // Stop QR scanner and close WebSocket
+    // Stop QR scanner - WebSocket will be managed by context
     if (qrScannerRef.current) {
       qrScannerRef.current.stop()
-    }
-    if (websocketRef.current) {
-      websocketRef.current.close()
     }
     setIsScanning(false)
   }
@@ -372,9 +380,7 @@ export function EegPairingScreen({ onComplete, onBack }: EegPairingScreenProps) 
       if (qrScannerRef.current) {
         qrScannerRef.current.destroy()
       }
-      if (websocketRef.current) {
-        websocketRef.current.close()
-      }
+      // WebSocket connection is managed by EEGConnectionContext
     }
   }, [])
 
