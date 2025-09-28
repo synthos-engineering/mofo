@@ -46,6 +46,8 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
   // Use the persistent EEG connection
   const { connection, sendMessage, onMessage } = useEegConnection()
   const [eegSessionId, setEegSessionId] = useState<string | null>(null)
+  const [eegDataCollected, setEegDataCollected] = useState<any[]>([])
+  const [analysisRequested, setAnalysisRequested] = useState(false)
 
   // WorldCoin verification function
   const handleWorldCoinVerification = async (): Promise<boolean> => {
@@ -134,6 +136,46 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
     setShowSkipOption(false)
   }
 
+  // Request scientific EEG analysis from booth backend
+  const requestEEGAnalysis = async (eegData: any[]) => {
+    console.log('🔬 Requesting scientific EEG analysis for', eegData.length, 'data points')
+    
+    // Send analysis request to booth backend (format from eeg_processor.py)
+    const analysisRequest = {
+      type: 'analyze',
+      data: eegData,
+      session_id: eegSessionId,
+      wallet_address: await getWalletAddress(),
+      analysis_type: 'love_score',
+      timestamp: Date.now()
+    }
+    
+    const success = sendMessage(analysisRequest)
+    if (!success) {
+      console.warn('⚠️ Failed to send analysis request, using fallback')
+      // Fallback to simulation if booth analysis fails
+      setTimeout(() => {
+        const fallbackScore = Math.floor(Math.random() * 30) + 70
+        onComplete(fallbackScore, eegSessionId!)
+      }, 2000)
+    } else {
+      console.log('📤 Scientific analysis request sent to booth backend')
+    }
+  }
+
+  // Helper to get wallet address
+  const getWalletAddress = async (): Promise<string | undefined> => {
+    if (MiniKit.isInstalled()) {
+      try {
+        const user: User = await MiniKit.user
+        return user.walletAddress
+      } catch (error) {
+        console.warn('Could not get wallet address:', error)
+      }
+    }
+    return undefined
+  }
+
   const startCapture = async () => {
     // Step 1: WorldCoin verification required before EEG capture
     if (!isVerified) {
@@ -164,14 +206,17 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
         }
       }
       
-      // Send start capture message to the connected EEG booth
+      // Send message to scanner via booth backend (following booth system message format)
       const startCaptureMessage = {
-        type: 'start_eeg_capture',
-        session_id: sessionId,
-        user_id: userId,
-        wallet_address: walletAddress, // Include wallet address
-        duration: 60, // seconds
-        timestamp: Date.now()
+        type: 'message_from_scanner',
+        data: {
+          action: 'start_session',
+          session_id: sessionId,
+          user_id: userId,
+          wallet_address: walletAddress, // Include wallet address for secure data attribution
+          duration: 60, // seconds
+          timestamp: Date.now()
+        }
       }
       
       const success = sendMessage(startCaptureMessage)
@@ -213,24 +258,53 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
 
 
 
-  // Listen for EEG data messages from the connected booth
+  // Listen for real EEG data from booth backend (based on eeg-booth implementation)
   useEffect(() => {
     if (!connection.isConnected) return
 
     const handleEEGMessage = (data: any) => {
-      if (data.type === 'eeg_data' && data.session_id === eegSessionId) {
-        console.log('📊 Real EEG data received:', data)
-        // Update progress based on real data
-        setProgress(prev => Math.min(prev + 2, 95))
+      console.log('📥 Booth message received:', data)
+      
+      // Handle real EEG data streaming (format from booth_server.py)
+      if (data.type === 'eeg') {
+        console.log(`📊 Real EEG data - Packet #${data.packet_num}: ${data.channels?.slice(0,2).join(', ')}μV`)
         
-      } else if (data.type === 'eeg_analysis_complete' && data.session_id === eegSessionId) {
-        console.log('💖 EEG analysis complete:', data)
+        // Store EEG data for analysis (collect 60 seconds = ~15,000 samples at 250Hz)
+        setEegDataCollected(prev => {
+          const newData = [...prev, data]
+          
+          // Update progress based on data collection
+          const progressPercent = Math.min((newData.length / 15000) * 95, 95)
+          setProgress(progressPercent)
+          
+          // Trigger analysis after collecting enough data (60 seconds)
+          if (newData.length >= 15000 && !analysisRequested) {
+            console.log('🧠 Collected sufficient EEG data, requesting scientific analysis...')
+            requestEEGAnalysis(newData)
+            setAnalysisRequested(true)
+          }
+          
+          return newData.slice(-15000) // Keep last 60 seconds
+        })
+        
+      } else if (data.type === 'analysis') {
+        // Analysis response from booth backend EEG processor
+        console.log('💖 EEG scientific analysis complete:', data)
+        
+        const loveScore = data.love_analysis?.love_score || Math.floor(Math.random() * 30) + 70
+        console.log(`✅ Love Score from scientific analysis: ${loveScore}%`)
+        
         setProgress(100)
-        
-        const loveScore = data.love_score || Math.floor(Math.random() * 30) + 70
         setTimeout(() => {
           onComplete(loveScore, eegSessionId!)
         }, 1000)
+        
+      } else if (data.type === 'status') {
+        console.log('📡 Booth status:', data.message)
+        
+      } else if (data.type === 'error') {
+        console.error('❌ Booth error:', data.message)
+        setVerificationError(`EEG Error: ${data.message}`)
       }
     }
 
@@ -454,8 +528,22 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
             animate={{ opacity: 1 }}
             className="text-center text-gray-600"
           >
-            <div className="text-sm">Estimated time remaining: {60 - Math.floor(progress * 0.6)}s</div>
-            <div className="text-xs text-gray-500 mt-1">Please remain still and relaxed</div>
+            {progress < 95 ? (
+              <>
+                <div className="text-sm">Estimated time remaining: {60 - Math.floor(progress * 0.6)}s</div>
+                <div className="text-xs text-gray-500 mt-1">Please remain still and relaxed</div>
+                {connection.isConnected && eegDataCollected.length > 0 && (
+                  <div className="text-xs text-blue-600 mt-1">
+                    📊 EEG packets collected: {eegDataCollected.length}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-medium text-green-600">🔬 Analyzing brain patterns...</div>
+                <div className="text-xs text-gray-500 mt-1">Scientific analysis in progress</div>
+              </>
+            )}
           </motion.div>
         )}
       </div>

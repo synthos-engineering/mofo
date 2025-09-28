@@ -88,9 +88,9 @@ export function EegConnectionProvider({ children }: { children: React.ReactNode 
             error: null
           }))
 
-          // Send initial connection message with wallet address
+          // Send scanner connection request (format from mock-scanner-frontend)
           const connectMessage = {
-            type: 'booth_connect',
+            type: 'connect_scanner',
             booth_id: boothData.booth_id,
             wallet_address: walletAddress, // Include wallet address from MiniKit
             timestamp: Date.now()
@@ -109,6 +109,27 @@ export function EegConnectionProvider({ children }: { children: React.ReactNode 
               ...prev,
               lastActivity: new Date()
             }))
+
+            // Handle connection success message from relayer
+            if (data.type === 'connection_success') {
+              console.log('🎉 Scanner connected to booth successfully!')
+              
+              // Send connection established message (format from mock-scanner-frontend)
+              const establishedMessage = {
+                type: 'relay_message',
+                data: {
+                  action: 'connection_established',
+                  message: 'Scanner connected and ready',
+                  booth_id: boothData.booth_id, // Include booth_id for reference
+                  timestamp: Date.now()
+                }
+              }
+              
+              if (websocketRef.current?.readyState === WebSocket.OPEN) {
+                websocketRef.current.send(JSON.stringify(establishedMessage))
+                console.log('📤 Sent connection established message to booth:', boothData.booth_id)
+              }
+            }
 
             // Notify all message handlers
             messageHandlersRef.current.forEach(handler => {
