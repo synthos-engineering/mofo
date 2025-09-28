@@ -224,68 +224,8 @@ export function EegCaptureScreen({ onComplete, userId, onBack }: EegCaptureScree
     }, 100) // Faster capture for demo (10 seconds instead of 60)
   }
 
-
-
-  // Listen for real EEG data from booth backend (based on eeg-booth implementation)
-  useEffect(() => {
-    if (!connection.isConnected) return
-
-    const handleEEGMessage = (data: any) => {
-      console.log('📥 Booth message received:', data)
-      
-      // Handle real EEG data streaming (format from booth_server.py)
-      if (data.type === 'eeg') {
-        console.log(`📊 Real EEG data - Packet #${data.packet_num}: ${data.channels?.slice(0,2).join(', ')}μV`)
-        
-        // Store EEG data for analysis (collect 60 seconds = ~15,000 samples at 250Hz)
-        setEegDataCollected(prev => {
-          const newData = [...prev, data]
-          
-          // Update progress based on data collection
-          const progressPercent = Math.min((newData.length / 15000) * 95, 95)
-          setProgress(progressPercent)
-          
-          // Trigger analysis after collecting enough data (60 seconds)
-          if (newData.length >= 15000 && !analysisRequested) {
-            console.log('🧠 Collected sufficient EEG data, requesting scientific analysis...')
-            requestEEGAnalysis(newData)
-            setAnalysisRequested(true)
-          }
-          
-          return newData.slice(-15000) // Keep last 60 seconds
-        })
-        
-      } else if (data.type === 'analysis') {
-        // Analysis response from booth backend EEG processor
-        console.log('💖 EEG scientific analysis complete:', data)
-        
-        const loveScore = data.love_analysis?.love_score || Math.floor(Math.random() * 30) + 70
-        console.log(`✅ Love Score from scientific analysis: ${loveScore}%`)
-        
-        setProgress(100)
-        setTimeout(() => {
-          onComplete(loveScore, eegSessionId!)
-        }, 1000)
-        
-      } else if (data.type === 'status') {
-        console.log('📡 Booth status:', data.message)
-        
-      } else if (data.type === 'error') {
-        console.error('❌ Booth error:', data.message)
-        setVerificationError(`EEG Error: ${data.message}`)
-      }
-    }
-
-    const unsubscribe = onMessage(handleEEGMessage)
-    return unsubscribe
-  }, [connection.isConnected, eegSessionId, onMessage, onComplete])
-
-  // Cleanup function for development
-  useEffect(() => {
-    return () => {
-      // Cleanup any intervals or connections
-    }
-  }, [])
+  // 🚧 HARDCODED: Removed real EEG data listener to avoid fetch errors
+  // Everything is simulated for demo purposes
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
