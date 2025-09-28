@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Brain, ChevronLeft, Shield } from 'lucide-react'
 
@@ -41,7 +41,6 @@ export function EegCaptureScreen({ onComplete, userId }: EegCaptureScreenProps) 
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-
       {/* Back Button */}
       <div className="px-6 pt-4">
         <button className="flex items-center text-gray-600 hover:text-gray-800">

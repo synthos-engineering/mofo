@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Brain, ChevronLeft, Camera, Shield, CheckCircle, AlertTriangle, ExternalLink, Type, Wifi, WifiOff } from 'lucide-react'
-import { MiniKit } from '@worldcoin/minikit-js'
+import { MiniKit, VerificationLevel } from '@worldcoin/minikit-js'
 
 // QR Scanner types (following mock-scanner-frontend pattern)
 declare global {
@@ -81,10 +81,10 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
               })
             }
 
-            // Auto-proceed to EEG capture after successful connection
+            // After connection, continue to next step
             setTimeout(() => {
               onComplete()
-            }, 2000)
+            }, 1000)
             
           } else if (message.type === 'error') {
             setConnectionStatus('error')
@@ -125,6 +125,91 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
       setError('Failed to establish connection to EEG booth')
     }
   }, [connectionStatus, onComplete])
+
+  // World ID verification for EEG brain scanning action
+  const handleEEGVerification = async () => {
+    if (!MiniKit.isInstalled()) {
+      console.log('MiniKit not installed, skipping verification...')
+      onComplete()
+      return
+    }
+
+    try {
+      console.log('🔐 Starting World ID verification for EEG brain scanning...')
+      
+      const { finalPayload } = await MiniKit.commandsAsync.verify({
+        action: 'generate-eeg-data', // Your action identifier
+        signal: boothData?.booth_id || 'eeg-session', // Use booth ID as signal
+        verification_level: VerificationLevel.Orb, // Orb verification for brain scanning
+      })
+
+      if (finalPayload.status === 'error') {
+        console.error('❌ World ID verification failed:', finalPayload)
+        setError('World ID verification failed. Brain scanning requires verification.')
+        
+        if (MiniKit.isInstalled()) {
+          MiniKit.commands.sendHapticFeedback({
+            hapticsType: 'notification',
+            style: 'error',
+          })
+        }
+        return
+      }
+
+      console.log('✅ World ID verification successful!')
+      
+      // Verify the proof with backend
+      const verifyResponse = await fetch('/api/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          payload: finalPayload,
+          action: 'generate-eeg-data',
+          signal: boothData?.booth_id || 'eeg-session',
+        }),
+      })
+
+      const verifyResult = await verifyResponse.json()
+      
+      if (verifyResult.status === 200) {
+        console.log('🎉 Backend verification successful! Proceeding to EEG capture...')
+        
+        // Send success haptic
+        if (MiniKit.isInstalled()) {
+          MiniKit.commands.sendHapticFeedback({
+            hapticsType: 'notification',
+            style: 'success',
+          })
+        }
+        
+        // Proceed to EEG capture
+        onComplete()
+      } else {
+        console.error('❌ Backend verification failed:', verifyResult)
+        setError('Verification failed on backend. Please try again.')
+        
+        if (MiniKit.isInstalled()) {
+          MiniKit.commands.sendHapticFeedback({
+            hapticsType: 'notification',
+            style: 'error',
+          })
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ EEG verification error:', error)
+      setError('Verification failed. Brain scanning requires World ID verification.')
+      
+      if (MiniKit.isInstalled()) {
+        MiniKit.commands.sendHapticFeedback({
+          hapticsType: 'notification',
+          style: 'error',
+        })
+      }
+    }
+  }
 
   // QR Scanner implementation with iPhone/Safari fixes
   const startQRScanning = async () => {
@@ -681,13 +766,13 @@ export function EegPairingScreen({ onComplete }: EegPairingScreenProps) {
               </div>
             )}
 
-            {/* Connection established - proceed button */}
+            {/* Connection established - verify and proceed button */}
             {connectionStatus === 'connected' && (
               <button
-                onClick={handleContinue}
+                onClick={handleEEGVerification}
                 className="w-full bg-green-600 text-white py-4 px-6 rounded-xl font-semibold text-lg shadow-lg hover:bg-green-700 transition-colors"
               >
-                ✅ Proceed to EEG Capture
+                🔐 Verify & Start EEG Scan
               </button>
             )}
 

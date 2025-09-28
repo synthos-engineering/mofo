@@ -56,23 +56,18 @@ export function AgentConfigurationScreen({ onComplete, userId, eegData }: AgentC
   }
 
   const resetToEEGValues = () => {
-    setTraits({
-      openness: 72,
-      conscientiousness: 85, 
-      extraversion: 45,
-      agreeableness: 68
-    })
-    updatePreview({
-      openness: 72,
-      conscientiousness: 85,
-      extraversion: 45, 
-      agreeableness: 68
-    })
+    const eegTraits = {
+      openness: eegData?.loveScore ? Math.min(eegData.loveScore + 20, 100) : 72,
+      conscientiousness: eegData?.loveScore ? Math.min(eegData.loveScore + 30, 100) : 85,
+      extraversion: eegData?.loveScore ? Math.max(eegData.loveScore - 10, 10) : 45,
+      agreeableness: eegData?.loveScore ? Math.min(eegData.loveScore + 8, 100) : 68
+    }
+    setTraits(eegTraits)
+    updatePreview(eegTraits)
   }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-
       {/* Back Button */}
       <div className="px-6 pt-4">
         <button className="flex items-center text-gray-600 hover:text-gray-800">
@@ -242,7 +237,7 @@ export function AgentConfigurationScreen({ onComplete, userId, eegData }: AgentC
         {/* Create Agent Button */}
         <button
           onClick={() => {
-            // Enhanced agent creation with EEG data
+            // Enhanced agent creation with EEG data (frontend-only)
             const agentData = {
               agentId: `agent_${userId || 'demo'}_${Date.now()}`,
               personalityTraits: {
